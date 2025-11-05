@@ -1,0 +1,28 @@
+﻿apiVersion: v1
+kind: Pod
+metadata:
+  name: user-service
+  labels:
+    role: user-service
+spec:
+  containers:
+    - name: user-service
+      image: matslo123/userservice:0.1.0
+      imagePullPolicy: IfNotPresent
+      ports:
+        - name: user-service
+          containerPort: 8080
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8080
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        
+  restartPolicy: Always
+  

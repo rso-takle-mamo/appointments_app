@@ -1,0 +1,5 @@
+**/bin/
+**/obj/
+.idea/
+**/config
+AppointmentService.sln.DotSettings.user
