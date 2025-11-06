@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: user-service-pod
+  labels:
+    app: user-service
+spec:
+  containers:
+  - name: user-service
+    image: user-service:latest
+    imagePullPolicy: Never
+    ports:
+    - containerPort: 8000
+    env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Development"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8000"
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
