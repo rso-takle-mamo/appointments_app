@@ -23,41 +23,41 @@ EXCEPTION
 END $$;
 
 -- Create Users table
-CREATE TABLE IF NOT EXISTS Users (
-    Id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    Username VARCHAR(255) UNIQUE NOT NULL,
-    Password VARCHAR(255) NOT NULL,
-    FirstName VARCHAR(255) NOT NULL,
-    LastName VARCHAR(255) NOT NULL,
-    Role UserRole NOT NULL,
-    TenantId UUID NULL,
-    CreatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UpdatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    firstname VARCHAR(255) NOT NULL,
+    lastname VARCHAR(255) NOT NULL,
+    role userrole NOT NULL,
+    tenantid UUID NULL,
+    createdat TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedat TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create Tenants table
-CREATE TABLE IF NOT EXISTS Tenants (
-    Id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    OwnerId UUID UNIQUE NOT NULL,
-    BusinessName VARCHAR(255) NOT NULL,
-    BusinessEmail VARCHAR(255) NULL,
-    BusinessPhone VARCHAR(50) NULL,
-    Address TEXT NOT NULL,
-    Description TEXT NULL,
-    CreatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UpdatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS tenants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ownerid UUID UNIQUE NOT NULL,
+    businessname VARCHAR(255) NOT NULL,
+    businessemail VARCHAR(255) NULL,
+    businessphone VARCHAR(50) NULL,
+    address TEXT NOT NULL,
+    description TEXT NULL,
+    createdat TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedat TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create indexes if they don't exist
-CREATE INDEX IF NOT EXISTS idx_users_username ON Users(Username);
-CREATE INDEX IF NOT EXISTS idx_users_tenantid ON Users(TenantId);
-CREATE INDEX IF NOT EXISTS idx_tenants_ownerid ON Tenants(OwnerId);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_tenantid ON users(tenantid);
+CREATE INDEX IF NOT EXISTS idx_tenants_ownerid ON tenants(ownerid);
 
 -- Create foreign key constraint if it doesn't exist
 DO $$
 BEGIN
-    ALTER TABLE Users ADD CONSTRAINT fk_users_tenant
-        FOREIGN KEY (TenantId) REFERENCES Tenants(Id) ON DELETE SET NULL;
+    ALTER TABLE users ADD CONSTRAINT fk_users_tenant
+        FOREIGN KEY (tenantid) REFERENCES tenants(id) ON DELETE SET NULL;
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -72,14 +72,14 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updating UpdatedAt if they don't exist
-DROP TRIGGER IF EXISTS update_users_updated_at ON Users;
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at
-    BEFORE UPDATE ON Users
+    BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_tenants_updated_at ON Tenants;
+DROP TRIGGER IF EXISTS update_tenants_updated_at ON tenants;
 CREATE TRIGGER update_tenants_updated_at
-    BEFORE UPDATE ON Tenants
+    BEFORE UPDATE ON tenants
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Grant specific permissions on created tables to userdb_user
@@ -88,8 +88,5 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO userdb_user;
 GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO userdb_user;
 
 -- Set table ownership to userdb_user for proper access
-ALTER TABLE Users OWNER TO userdb_user;
-ALTER TABLE Tenants OWNER TO userdb_user;
-
--- Note: No sample data inserted - tables will be empty on creation
--- Applications should handle initial data seeding as needed
+ALTER TABLE users OWNER TO userdb_user;
+ALTER TABLE tenants OWNER TO userdb_user;

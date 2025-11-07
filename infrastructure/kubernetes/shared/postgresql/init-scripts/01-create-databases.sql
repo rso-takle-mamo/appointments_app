@@ -4,6 +4,9 @@
 -- User Service Database
 CREATE DATABASE userdb;
 
+-- Service Catalog Service Database
+CREATE DATABASE servicecatalogdb;
+
 
 -- Create service-specific users with limited permissions
 -- Each user can only access their own database
@@ -11,6 +14,10 @@ CREATE DATABASE userdb;
 -- User Service user
 CREATE USER userdb_user WITH PASSWORD 'userdb_password';
 
+-- Service Catalog Service user
+CREATE USER servicecatalogdb_user WITH PASSWORD 'servicecatalogdb_password';
+
 
 -- Grant database-level permissions
 GRANT ALL PRIVILEGES ON DATABASE userdb TO userdb_user;
+GRANT ALL PRIVILEGES ON DATABASE servicecatalogdb TO servicecatalogdb_user;
