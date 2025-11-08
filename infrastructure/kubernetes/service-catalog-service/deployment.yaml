@@ -17,7 +17,7 @@ spec:
       containers:
       - name: service-catalog-service
         image: service-catalog-service:latest
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         # image: matslo123/servicecatalogservice:0.1.0
         # imagePullPolicy: IfNotPresent
         ports:
@@ -30,5 +30,5 @@ spec:
         - name: DATABASE_CONNECTION_STRING
           valueFrom:
             secretKeyRef:
-              name: service-catalog-service-db-secret
+              name: service-catalog-db-secret
               key: connection-string

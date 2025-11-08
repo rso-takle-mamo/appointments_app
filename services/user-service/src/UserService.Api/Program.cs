@@ -1,28 +1,29 @@
-using Microsoft.EntityFrameworkCore;
-using UserService.Api.Data;
-using UserService.Api.Services;
+using System.Text.Json;
 using UserService.Api.Validators;
+using UserService.Database;
+using UserService.Database.Repositories.Implementation;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
-builder.Services.AddOpenApi();
-
-// Database configuration
-var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING");
-
-if (string.IsNullOrEmpty(connectionString))
+builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    Console.WriteLine("DATABASE_CONNECTION_STRING environment variable is not set");
-    Environment.Exit(1);
+    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
+
+if (builder.Environment.IsDevelopment())
+{
+    // Add open api and swagger for development
+    builder.Services.AddOpenApi();
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
 }
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+builder.Configuration.AddEnvironmentVariables();
+
+builder.Services.AddUserDatabase();
 
 // Register services
-builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<ValidModelFilter>();
 
 var app = builder.Build();
@@ -31,6 +32,8 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();

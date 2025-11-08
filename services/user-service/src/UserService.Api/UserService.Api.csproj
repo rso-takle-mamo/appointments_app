@@ -8,8 +8,16 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10"/>
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2"/>
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\UserService.Database\UserService.Database.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Services\" />
     </ItemGroup>
 
 </Project>

@@ -4,6 +4,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.Api", "services
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceCatalogService.Api", "services\service-catalog-service\src\ServiceCatalogService.Api\ServiceCatalogService.Api.csproj", "{C5EB2C1B-5D74-4368-9C71-6076E1617A71}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.Database", "services\user-service\src\UserService.Database\UserService.Database.csproj", "{8C65B450-57E3-4B3E-8566-5818E6E53190}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatabaseMigrator", "database\migrations\DatabaseMigrator\DatabaseMigrator\DatabaseMigrator.csproj", "{096EA5D3-55A1-44C6-B2B8-CFD497FAE620}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.DatabaseMigrator", "services\user-service\src\UserService.DatabaseMigrator\UserService.DatabaseMigrator.csproj", "{C5387FB6-B9E3-483F-95DA-50F3BA53C3FE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceCatalogService.Database", "services\service-catalog-service\src\ServiceCatalogService.Database\ServiceCatalogService.Database.csproj", "{BF726591-07C2-43AD-AE51-7EB0F23A8FE5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceCatalogService.DatabaseMigrator", "services\service-catalog-service\src\ServiceCatalogService.DatabaseMigrator\ServiceCatalogService.DatabaseMigrator.csproj", "{B1E461F8-F63E-4447-8953-18432685A931}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +28,25 @@ Global
 		{C5EB2C1B-5D74-4368-9C71-6076E1617A71}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C5EB2C1B-5D74-4368-9C71-6076E1617A71}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C5EB2C1B-5D74-4368-9C71-6076E1617A71}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C65B450-57E3-4B3E-8566-5818E6E53190}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C65B450-57E3-4B3E-8566-5818E6E53190}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C65B450-57E3-4B3E-8566-5818E6E53190}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C65B450-57E3-4B3E-8566-5818E6E53190}.Release|Any CPU.Build.0 = Release|Any CPU
+		{096EA5D3-55A1-44C6-B2B8-CFD497FAE620}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{096EA5D3-55A1-44C6-B2B8-CFD497FAE620}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{096EA5D3-55A1-44C6-B2B8-CFD497FAE620}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{096EA5D3-55A1-44C6-B2B8-CFD497FAE620}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5387FB6-B9E3-483F-95DA-50F3BA53C3FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5387FB6-B9E3-483F-95DA-50F3BA53C3FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5387FB6-B9E3-483F-95DA-50F3BA53C3FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5387FB6-B9E3-483F-95DA-50F3BA53C3FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF726591-07C2-43AD-AE51-7EB0F23A8FE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF726591-07C2-43AD-AE51-7EB0F23A8FE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF726591-07C2-43AD-AE51-7EB0F23A8FE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF726591-07C2-43AD-AE51-7EB0F23A8FE5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1E461F8-F63E-4447-8953-18432685A931}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1E461F8-F63E-4447-8953-18432685A931}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1E461F8-F63E-4447-8953-18432685A931}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1E461F8-F63E-4447-8953-18432685A931}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

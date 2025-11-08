@@ -1,30 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
+using ServiceCatalogService.Api.Dtos;
 using ServiceCatalogService.Api.Extensions;
-using ServiceCatalogService.Api.Interfaces;
-using ServiceCatalogService.Api.Models.DTOs;
-using ServiceCatalogService.Api.Models.Entities;
-using ServiceCatalogService.Api.Services;
+using ServiceCatalogService.Api.Requests;
+using ServiceCatalogService.Database.Entities;
+using ServiceCatalogService.Database.Repositories.Interfaces;
+using ServiceCatalogService.Database.UpdateModels;
 
 namespace ServiceCatalogService.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ServicesController(IServiceService serviceService) : ControllerBase
+public class ServicesController(IServiceRepository serviceRepository) : ControllerBase
 {
-    private readonly IServiceService _serviceService = serviceService;
-
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ServiceResponse>>> GetServices([FromQuery] Guid? tenantId = null)
     {
-        var services = await _serviceService.GetAllServicesAsync(tenantId);
+        var services = await serviceRepository.GetAllServicesAsync(tenantId);
         var response = services.Where(s => s.IsActive).Select(s => s.ToServiceResponse());
         return Ok(response);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}")]
     public async Task<ActionResult<ServiceResponse>> GetService(Guid id)
     {
-        var service = await _serviceService.GetServiceByIdAsync(id);
+        var service = await serviceRepository.GetServiceByIdAsync(id);
 
         if (service == null)
         {
@@ -34,10 +33,10 @@ public class ServicesController(IServiceService serviceService) : ControllerBase
         return Ok(service.ToServiceResponse());
     }
 
-    [HttpGet("tenant/{tenantId}")]
+    [HttpGet("tenant/{tenantId:guid}")]
     public async Task<ActionResult<IEnumerable<ServiceResponse>>> GetServicesByTenant(Guid tenantId)
     {
-        var services = await _serviceService.GetAllServicesAsync(tenantId);
+        var services = await serviceRepository.GetAllServicesAsync(tenantId);
         var response = services.Where(s => s.IsActive).Select(s => s.ToServiceResponse());
         return Ok(response);
     }
@@ -45,15 +44,35 @@ public class ServicesController(IServiceService serviceService) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ServiceResponse>> CreateService([FromBody] CreateServiceRequest request)
     {
-        var service = await _serviceService.CreateServiceAsync(request);
+        var service = new Service
+        {
+            Id = Guid.NewGuid(),
+            TenantId = request.TenantId,
+            Name = request.Name,
+            Description = request.Description,
+            Price = request.Price,
+            DurationMinutes = request.DurationMinutes,
+            CategoryId = request.CategoryId,
+            IsActive = request.IsActive,
+        };
+        await serviceRepository.CreateServiceAsync(service);
         var response = service.ToServiceResponse();
         return CreatedAtAction(nameof(GetService), new { id = response.Id }, response);
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateService(Guid id, [FromBody] UpdateServiceRequest request)
     {
-        var success = await _serviceService.UpdateServiceAsync(id, request);
+        var updateRequest = new UpdateService
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Price = request.Price,
+            DurationMinutes = request.DurationMinutes,
+            CategoryId = request.CategoryId,
+            IsActive = request.IsActive,
+        };
+        var success = await serviceRepository.UpdateServiceAsync(id, updateRequest);
 
         if (!success)
         {
@@ -63,10 +82,10 @@ public class ServicesController(IServiceService serviceService) : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteService(Guid id)
     {
-        var success = await _serviceService.DeleteServiceAsync(id);
+        var success = await serviceRepository.DeleteServiceAsync(id);
 
         if (!success)
         {
@@ -76,10 +95,10 @@ public class ServicesController(IServiceService serviceService) : ControllerBase
         return NoContent();
     }
 
-    [HttpPatch("{id}/toggle")]
+    [HttpPatch("{id:guid}/toggle")]
     public async Task<IActionResult> ToggleService(Guid id)
     {
-        var success = await _serviceService.ToggleServiceAsync(id);
+        var success = await serviceRepository.ToggleServiceAsync(id);
 
         if (!success)
         {

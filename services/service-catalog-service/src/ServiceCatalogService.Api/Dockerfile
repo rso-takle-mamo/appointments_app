@@ -1,15 +1,15 @@
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
-EXPOSE 8001
-ENV ASPNETCORE_URLS=http://+:8001
+EXPOSE 8000
+ENV ASPNETCORE_URLS=http://+:8000
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["ServiceCatalogService.Api.csproj", "./"]
-RUN dotnet restore "./ServiceCatalogService.Api.csproj"
+COPY ["ServiceCatalogService.Api/ServiceCatalogService.Api.csproj", "ServiceCatalogService.Api/"]
+RUN dotnet restore "ServiceCatalogService.Api/ServiceCatalogService.Api.csproj"
 COPY . .
-WORKDIR "/src/."
+WORKDIR "/src/ServiceCatalogService.Api"
 RUN dotnet build "./ServiceCatalogService.Api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish

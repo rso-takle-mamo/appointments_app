@@ -17,9 +17,9 @@ spec:
       containers:
       - name: user-service
         image: user-service:latest
-        imagePullPolicy: Never
-        # image: matslo123/userservice:0.1.0
-        # imagePullPolicy: IfNotPresent
+        imagePullPolicy: IfNotPresent
+        #image: matslo123/userservice:0.1.0
+        #imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
         env:

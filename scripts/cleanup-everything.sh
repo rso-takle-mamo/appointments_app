@@ -33,5 +33,8 @@ kubectl delete configmap --all --ignore-not-found=true
 echo "Deleting all Secrets..."
 kubectl delete secret --all --ignore-not-found=true
 
+echo "Deleting all jobs..."
+kubectl delete job --all --ignore-not-found=true
+
 echo "Waiting for resources to be cleaned up..."
 sleep 10

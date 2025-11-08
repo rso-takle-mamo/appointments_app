@@ -7,31 +7,26 @@ eval "$(minikube docker-env --shell bash)"
 kubectl apply -f infrastructure/kubernetes/shared/postgresql/postgresql-pvc.yaml
 
 kubectl apply -f infrastructure/kubernetes/shared/postgresql/postgresql-secret.yaml
+
 kubectl apply -f infrastructure/kubernetes/shared/secrets/user-service-secret.yaml
+kubectl apply -f infrastructure/kubernetes/shared/secrets/service-catalog-service-secret.yaml
 
 kubectl apply -f infrastructure/kubernetes/shared/postgresql/postgresql-configmap.yaml
-
-kubectl create configmap shared-postgresql-init-scripts \
-  --from-file=infrastructure/kubernetes/shared/postgresql/init-scripts/ \
-  --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f infrastructure/kubernetes/shared/postgresql/postgresql-service.yaml
 
 kubectl apply -f infrastructure/kubernetes/shared/postgresql/postgresql-deployment.yaml
 
+echo "Waiting for database to start up. This can take a while..."
+
 kubectl wait --for=condition=ready pod -l app=shared-postgresql --timeout=180s
-
-echo "Verifying database initialization..."
-
-kubectl exec deployment/shared-postgresql -- psql -U postgres -d postgres -c "\l userdb" | grep "userdb"
-
-kubectl exec deployment/shared-postgresql -- psql -U postgres -d postgres -c "\du" | grep "userdb_user"
-
-kubectl exec deployment/shared-postgresql -- psql -U userdb_user -d userdb -c "\dt" | grep -E "(users|tenants)"
 
 echo "Database Details:"
 echo "   Service: shared-postgresql-service:5432"
-echo "   Admin: postgres (password in secret)"
-echo "   User DB: userdb (user: userdb_user)"
-echo ""
-kubectl get secret user-service-db-secret -o jsonpath='{.data.connection-string}' | base64 --decode
+echo "Running migrations for all services..."
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+bash "$SCRIPT_DIR/migrate-all.sh"
+
+echo "All migrations complete"

@@ -104,7 +104,6 @@ yarn-error.log*
 .dockerignore
 
 # Kubernetes secrets (don't commit secrets!)
-*-secret.yaml
 *.key
 *.pem
 *.crt

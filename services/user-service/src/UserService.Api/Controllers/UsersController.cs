@@ -1,16 +1,15 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using UserService.Api.Data;
+using UserService.Api.Dtos;
 using UserService.Api.Extensions;
-using UserService.Api.Models.Dtos;
-using UserService.Api.Models.Entities;
-using UserService.Api.Services;
 using UserService.Api.Validators;
+using UserService.Database.Entities;
+using UserService.Database.Repositories.Interfaces;
 
 namespace UserService.Api.Controllers;
 
 [ApiController]
 [Route("api/users")]
-public class UsersController(UserRepository userRepository) : ControllerBase
+public class UsersController(IUserRepository userRepository) : ControllerBase
 {
     [HttpGet("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -21,7 +20,6 @@ public class UsersController(UserRepository userRepository) : ControllerBase
         if (user == null) return NotFound();
         return Ok(user.ToResponse());
     }
-
     
     [HttpPost]
     [ServiceFilter(typeof(ValidModelFilter))]
@@ -33,11 +31,8 @@ public class UsersController(UserRepository userRepository) : ControllerBase
         {
             return BadRequest(new { Message = "Username already exists" });
         }
-
-        var roleString = createUserRequest.Role ??
-            (createUserRequest.TenantId.HasValue ? "Provider" : "Customer");
-        var userRole = UserRoleExtensions.FromPostgresValue(roleString);
-
+        
+        // TODO check that tenant exists
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -45,7 +40,8 @@ public class UsersController(UserRepository userRepository) : ControllerBase
             LastName = createUserRequest.LastName,
             Username = createUserRequest.Username,
             Password = createUserRequest.Password,
-            Role = userRole,
+            Email = createUserRequest.Email,
+            Role = createUserRequest.Role,
             TenantId = createUserRequest.TenantId
         };
 

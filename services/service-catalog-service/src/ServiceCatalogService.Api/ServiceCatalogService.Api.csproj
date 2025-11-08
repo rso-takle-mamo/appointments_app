@@ -8,20 +8,11 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10"/>
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2"/>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2"/>
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Controllers\" />
-      <Folder Include="Data\" />
-      <Folder Include="Models\" />
-      <Folder Include="Models\Entities\" />
-      <Folder Include="Models\DTOs\" />
-      <Folder Include="Services\" />
-      <Folder Include="Interfaces\" />
-      <Folder Include="Extensions\" />
-      <Folder Include="Middleware\" />
+      <ProjectReference Include="..\ServiceCatalogService.Database\ServiceCatalogService.Database.csproj" />
     </ItemGroup>
 
 </Project>

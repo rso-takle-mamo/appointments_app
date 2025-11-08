@@ -1,6 +1,5 @@
-using UserService.Api.Data;
-using UserService.Api.Models.Entities;
-using UserService.Api.Models.Dtos;
+using UserService.Api.Dtos;
+using UserService.Database.Entities;
 
 namespace UserService.Api.Extensions;
 
@@ -14,7 +13,8 @@ public static class UserExtensions
             Username = user.Username,
             FirstName = user.FirstName,
             LastName = user.LastName,
-            Role = user.Role.ToPostgresValue(),
+            Email = user.Email,
+            Role = user.Role,
             TenantId = user.TenantId,
             CreatedAt = user.CreatedAt,
             UpdatedAt = user.UpdatedAt

@@ -1,5 +1,6 @@
-using ServiceCatalogService.Api.Models.DTOs;
-using ServiceCatalogService.Api.Models.Entities;
+using ServiceCatalogService.Api.Dtos;
+using ServiceCatalogService.Api.Requests;
+using ServiceCatalogService.Database.Entities;
 
 namespace ServiceCatalogService.Api.Extensions;
 
