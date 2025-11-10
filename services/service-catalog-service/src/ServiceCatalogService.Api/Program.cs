@@ -1,4 +1,7 @@
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using HealthChecks.UI.Client;
 using ServiceCatalogService.Api.Middleware;
 using ServiceCatalogService.Database;
 
@@ -24,6 +27,26 @@ if (builder.Environment.IsDevelopment())
 
 // Database configuration
 builder.Services.AddServiceCatalogDatabase();
+
+// Health checks configuration
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () =>
+    {
+        try
+        {
+            return HealthCheckResult.Healthy("Service is running");
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy("Service check failed", ex);
+        }
+    }, tags: ["self"])
+    .AddNpgSql(
+        connectionString: EnvironmentVariables.GetRequiredVariable("DATABASE_CONNECTION_STRING"),
+        healthQuery: "SELECT 1;",
+        name: "postgresql",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["db", "postgresql"]);
 
 // Register middleware
 builder.Services.AddTransient<GlobalExceptionHandler>();
@@ -57,5 +80,27 @@ app.UseMiddleware<GlobalExceptionHandler>();
 app.UseHttpsRedirection();
 
 app.MapControllers();
+
+// Health check endpoints
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
+    AllowCachingResponses = false
+});
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = (check) => check.Tags.Contains("self"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
+    AllowCachingResponses = false
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = (check) => check.Tags.Contains("self") || check.Tags.Contains("db"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
+    AllowCachingResponses = false
+});
+
 
 app.Run();
