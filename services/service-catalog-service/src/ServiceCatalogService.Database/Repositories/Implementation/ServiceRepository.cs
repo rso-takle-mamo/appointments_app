@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ServiceCatalogService.Database.Entities;
+using ServiceCatalogService.Database.Models;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
 
@@ -7,7 +8,7 @@ namespace ServiceCatalogService.Database.Repositories.Implementation;
 
 public class ServiceRepository(ServiceCatalogDbContext context) : IServiceRepository
 {
-    public async Task<IReadOnlyCollection<Service>> GetAllServicesAsync(Guid? tenantId = null)
+    public async Task<(IReadOnlyCollection<Service> Services, int TotalCount)> GetServicesAsync(PaginationParameters parameters, Guid? tenantId = null)
     {
         var query = context.Services
             .Include(s => s.Category)
@@ -19,9 +20,15 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
             query = query.Where(s => s.TenantId == tenantId.Value);
         }
 
-        return await query
+        var totalCount = await query.CountAsync();
+
+        var services = await query
             .OrderBy(s => s.Name)
+            .Skip(parameters.Offset)
+            .Take(parameters.Limit)
             .ToListAsync();
+
+        return (services, totalCount);
     }
 
     public async Task<Service?> GetServiceByIdAsync(Guid id)
@@ -95,21 +102,6 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
         context.Services.Remove(service);
         await context.SaveChangesAsync();
 
-        return true;
-    }
-
-    public async Task<bool> ToggleServiceAsync(Guid id)
-    {
-        var service = await context.Services.FindAsync(id);
-        if (service == null)
-        {
-            return false;
-        }
-
-        service.IsActive = !service.IsActive;
-        service.UpdatedAt = DateTime.UtcNow;
-
-        await context.SaveChangesAsync();
         return true;
     }
 }

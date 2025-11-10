@@ -1,4 +1,4 @@
-namespace ServiceCatalogService.Api.Dtos;
+namespace ServiceCatalogService.Api.Responses;
 
 public class ServiceResponse
 {

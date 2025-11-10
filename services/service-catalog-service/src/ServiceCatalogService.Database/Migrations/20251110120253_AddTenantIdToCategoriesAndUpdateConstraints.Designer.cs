@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ServiceCatalogService.Database;
 
 #nullable disable
 
-namespace ServiceCatalogService.Database.Migrations
+namespace UserService.Database.Migrations
 {
     [DbContext(typeof(ServiceCatalogDbContext))]
-    partial class ServiceCatalogDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251110120253_AddTenantIdToCategoriesAndUpdateConstraints")]
+    partial class AddTenantIdToCategoriesAndUpdateConstraints
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

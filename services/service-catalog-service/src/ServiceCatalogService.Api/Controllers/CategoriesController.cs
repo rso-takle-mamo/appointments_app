@@ -1,21 +1,49 @@
 using Microsoft.AspNetCore.Mvc;
-using ServiceCatalogService.Api.Dtos;
+using ServiceCatalogService.Api.Responses;
 using ServiceCatalogService.Api.Extensions;
 using ServiceCatalogService.Api.Requests;
+using ServiceCatalogService.Database.Models;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
 
 namespace ServiceCatalogService.Api.Controllers;
 
-[Route("api/services/[controller]")]
+[Route("api/services/categories")]
 [ApiController]
 public class CategoriesController(ICategoryRepository categoryRepository) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<CategoryResponse>>> GetCategories()
+    public async Task<ActionResult<PaginatedResponse<CategoryResponse>>> GetCategories(
+        [FromQuery] int offset = 0,
+        [FromQuery] int limit = 100,
+        [FromQuery] Guid? tenantId = null)
     {
-        var categories = await categoryRepository.GetAllCategoriesAsync();
-        var response = categories.Select(c => c.ToCategoryResponse());
+        if (offset < 0)
+        {
+            throw new ArgumentException("Offset must be greater than or equal to 0");
+        }
+
+        if (limit is < 1 or > 100)
+        {
+            throw new ArgumentException("Limit must be between 1 and 100");
+        }
+
+        var parameters = new PaginationParameters
+        {
+            Offset = offset,
+            Limit = limit
+        };
+
+        var (categories, totalCount) = await categoryRepository.GetCategoriesAsync(parameters, tenantId);
+
+        var response = new PaginatedResponse<CategoryResponse>
+        {
+            Offset = offset,
+            Limit = limit,
+            TotalCount = totalCount,
+            Data = categories.Select(c => c.ToCategoryResponse()).ToList()
+        };
+
         return Ok(response);
     }
 
@@ -41,8 +69,8 @@ public class CategoriesController(ICategoryRepository categoryRepository) : Cont
         return CreatedAtAction(nameof(GetCategory), new { id = response.Id }, response);
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> UpdateCategory(Guid id, [FromBody] UpdateCategoryRequest request)
+    [HttpPatch("{id:guid}")]
+    public async Task<ActionResult<CategoryResponse>> UpdateCategory(Guid id, [FromBody] UpdateCategoryRequest request)
     {
         var updateRequest = new UpdateCategory
         {
@@ -56,7 +84,8 @@ public class CategoriesController(ICategoryRepository categoryRepository) : Cont
             return NotFound();
         }
 
-        return NoContent();
+        var updatedCategory = await categoryRepository.GetCategoryByIdAsync(id);
+        return Ok(updatedCategory!.ToCategoryResponse());
     }
 
     [HttpDelete("{id:guid}")]

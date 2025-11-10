@@ -39,6 +39,15 @@ if (app.Environment.IsDevelopment())
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "ServiceCatalog API v1");
         c.RoutePrefix = "swagger";
+        // Hide the black topbar
+        c.HeadContent = 
+        """
+            <style>
+                .swagger-ui .topbar { 
+                    display: none; 
+                }
+            </style>
+         """;
     });
 }
 

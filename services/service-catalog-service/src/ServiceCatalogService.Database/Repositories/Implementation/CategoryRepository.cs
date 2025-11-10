@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ServiceCatalogService.Database.Entities;
+using ServiceCatalogService.Database.Models;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
 
@@ -7,12 +8,26 @@ namespace ServiceCatalogService.Database.Repositories.Implementation;
 
 public class CategoryRepository(ServiceCatalogDbContext context) : ICategoryRepository
 {
-    public async Task<IEnumerable<Category>> GetAllCategoriesAsync()
+    public async Task<(IEnumerable<Category> Categories, int TotalCount)> GetCategoriesAsync(PaginationParameters parameters, Guid? tenantId = null)
     {
-        return await context.Categories
+        var query = context.Categories
             .AsNoTracking()
+            .AsQueryable();
+
+        if (tenantId.HasValue)
+        {
+            query = query.Where(c => c.TenantId == tenantId.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var categories = await query
             .OrderBy(c => c.Name)
+            .Skip(parameters.Offset)
+            .Take(parameters.Limit)
             .ToListAsync();
+
+        return (categories, totalCount);
     }
 
     public async Task<Category?> GetCategoryByIdAsync(Guid id)

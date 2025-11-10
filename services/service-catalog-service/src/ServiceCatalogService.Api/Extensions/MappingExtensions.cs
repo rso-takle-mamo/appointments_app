@@ -1,5 +1,5 @@
-using ServiceCatalogService.Api.Dtos;
 using ServiceCatalogService.Api.Requests;
+using ServiceCatalogService.Api.Responses;
 using ServiceCatalogService.Database.Entities;
 
 namespace ServiceCatalogService.Api.Extensions;
@@ -11,6 +11,7 @@ public static class MappingExtensions
         return new CategoryResponse
         {
             Id = category.Id,
+            TenantId = category.TenantId,
             Name = category.Name,
             Description = category.Description,
             CreatedAt = category.CreatedAt,
@@ -40,6 +41,7 @@ public static class MappingExtensions
     {
         return new Category
         {
+            TenantId = request.TenantId,
             Name = request.Name,
             Description = request.Description
         };

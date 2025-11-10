@@ -1,8 +1,10 @@
-﻿namespace ServiceCatalogService.Api.Dtos;
+﻿namespace ServiceCatalogService.Api.Responses;
 
 public class CategoryResponse
 {
     public Guid Id { get; set; }
+
+    public Guid TenantId { get; set; }
 
     public string Name { get; set; } = null!;
 

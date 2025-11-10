@@ -1,22 +1,50 @@
 using Microsoft.AspNetCore.Mvc;
-using ServiceCatalogService.Api.Dtos;
+using ServiceCatalogService.Api.Responses;
 using ServiceCatalogService.Api.Extensions;
 using ServiceCatalogService.Api.Requests;
 using ServiceCatalogService.Database.Entities;
+using ServiceCatalogService.Database.Models;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
 
 namespace ServiceCatalogService.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/services")]
 public class ServicesController(IServiceRepository serviceRepository) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ServiceResponse>>> GetServices([FromQuery] Guid? tenantId = null)
+    public async Task<ActionResult<PaginatedResponse<ServiceResponse>>> GetServices(
+        [FromQuery] int offset = 0,
+        [FromQuery] int limit = 100,
+        [FromQuery] Guid? tenantId = null)
     {
-        var services = await serviceRepository.GetAllServicesAsync(tenantId);
-        var response = services.Where(s => s.IsActive).Select(s => s.ToServiceResponse());
+        if (offset < 0)
+        {
+            throw new ArgumentException("Offset must be greater than or equal to 0");
+        }
+
+        if (limit is < 1 or > 100)
+        {
+            throw new ArgumentException("Limit must be between 1 and 100");
+        }
+
+        var parameters = new PaginationParameters
+        {
+            Offset = offset,
+            Limit = limit
+        };
+
+        var (services, totalCount) = await serviceRepository.GetServicesAsync(parameters, tenantId);
+
+        var response = new PaginatedResponse<ServiceResponse>
+        {
+            Offset = offset,
+            Limit = limit,
+            TotalCount = totalCount,
+            Data = services.Where(s => s.IsActive).Select(s => s.ToServiceResponse()).ToList()
+        };
+
         return Ok(response);
     }
 
@@ -32,15 +60,7 @@ public class ServicesController(IServiceRepository serviceRepository) : Controll
 
         return Ok(service.ToServiceResponse());
     }
-
-    [HttpGet("tenant/{tenantId:guid}")]
-    public async Task<ActionResult<IEnumerable<ServiceResponse>>> GetServicesByTenant(Guid tenantId)
-    {
-        var services = await serviceRepository.GetAllServicesAsync(tenantId);
-        var response = services.Where(s => s.IsActive).Select(s => s.ToServiceResponse());
-        return Ok(response);
-    }
-
+    
     [HttpPost]
     public async Task<ActionResult<ServiceResponse>> CreateService([FromBody] CreateServiceRequest request)
     {
@@ -60,8 +80,8 @@ public class ServicesController(IServiceRepository serviceRepository) : Controll
         return CreatedAtAction(nameof(GetService), new { id = response.Id }, response);
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> UpdateService(Guid id, [FromBody] UpdateServiceRequest request)
+    [HttpPatch("{id:guid}")]
+    public async Task<ActionResult<ServiceResponse>> UpdateService(Guid id, [FromBody] UpdateServiceRequest request)
     {
         var updateRequest = new UpdateService
         {
@@ -79,7 +99,9 @@ public class ServicesController(IServiceRepository serviceRepository) : Controll
             return NotFound();
         }
 
-        return NoContent();
+        // Get the updated service and return it
+        var updatedService = await serviceRepository.GetServiceByIdAsync(id);
+        return Ok(updatedService!.ToServiceResponse());
     }
 
     [HttpDelete("{id:guid}")]
@@ -95,16 +117,4 @@ public class ServicesController(IServiceRepository serviceRepository) : Controll
         return NoContent();
     }
 
-    [HttpPatch("{id:guid}/toggle")]
-    public async Task<IActionResult> ToggleService(Guid id)
-    {
-        var success = await serviceRepository.ToggleServiceAsync(id);
-
-        if (!success)
-        {
-            return NotFound();
-        }
-
-        return NoContent();
     }
-}
