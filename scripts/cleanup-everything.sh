@@ -1,11 +1,10 @@
 #!/bin/bash
 
-echo "CLEANING UP ALL KUBERNETES RESOURCES..."
-echo "=========================================="
-echo "WARNING: This will delete ALL deployments, services, PVCs, and data!"
+echo "Cleaning up appointments-app resources..."
+echo "======================================="
+echo "WARNING: This will delete ALL deployments, services, PVCs, ingress, migrations, and data!"
 echo ""
 
-# Ask for confirmation
 read -p "Are you sure you want to delete everything? (yes/no): " confirm
 if [ "$confirm" != "yes" ]; then
     echo "Cleanup cancelled."
@@ -15,26 +14,8 @@ fi
 echo ""
 echo "Starting cleanup..."
 
-echo "Deleting all deployments..."
-kubectl delete deployment --all --ignore-not-found=true
+# Delete namespace (removes EVERYTHING in appointments-app namespace)
+echo "Deleting appointments-app namespace..."
+kubectl delete namespace appointments-app --ignore-not-found=true
 
-echo "Deleting all services..."
-kubectl delete service --all --ignore-not-found=true
-
-echo "Deleting all pods..."
-kubectl delete pod --all --ignore-not-found=true
-
-echo "Deleting all PVCs (this will delete all data)..."
-kubectl delete pvc --all --ignore-not-found=true
-
-echo "Deleting all ConfigMaps..."
-kubectl delete configmap --all --ignore-not-found=true
-
-echo "Deleting all Secrets..."
-kubectl delete secret --all --ignore-not-found=true
-
-echo "Deleting all jobs..."
-kubectl delete job --all --ignore-not-found=true
-
-echo "Waiting for resources to be cleaned up..."
-sleep 10
+echo "Cleanup completed."
