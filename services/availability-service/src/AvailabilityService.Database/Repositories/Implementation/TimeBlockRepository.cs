@@ -1,0 +1,117 @@
+using Microsoft.EntityFrameworkCore;
+using AvailabilityService.Database.Entities;
+using AvailabilityService.Database.Models;
+using AvailabilityService.Database.Repositories.Interfaces;
+using AvailabilityService.Database.UpdateModels;
+
+namespace AvailabilityService.Database.Repositories.Implementation;
+
+public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepository
+{
+    public async Task<(IEnumerable<TimeBlock> TimeBlocks, int TotalCount)> GetTimeBlocksAsync(PaginationParameters parameters, Guid? tenantId = null)
+    {
+        var query = context.TimeBlocks
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (tenantId.HasValue)
+        {
+            query = query.Where(tb => tb.TenantId == tenantId.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var timeBlocks = await query
+            .OrderBy(tb => tb.StartDateTime)
+            .Skip(parameters.Offset)
+            .Take(parameters.Limit)
+            .ToListAsync();
+
+        return (timeBlocks, totalCount);
+    }
+
+    public async Task<(IEnumerable<TimeBlock> TimeBlocks, int TotalCount)> GetTimeBlocksByDateRangeAsync(DateTime start, DateTime end, Guid? tenantId = null)
+    {
+        var query = context.TimeBlocks
+            .AsNoTracking()
+            .Where(tb => tb.StartDateTime >= start && tb.EndDateTime <= end);
+
+        if (tenantId.HasValue)
+        {
+            query = query.Where(tb => tb.TenantId == tenantId.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var timeBlocks = await query
+            .OrderBy(tb => tb.StartDateTime)
+            .ToListAsync();
+
+        return (timeBlocks, totalCount);
+    }
+
+    public async Task<TimeBlock?> GetTimeBlockByIdAsync(Guid id)
+    {
+        return await context.TimeBlocks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(tb => tb.Id == id);
+    }
+
+    public async Task CreateTimeBlockAsync(TimeBlock timeBlock)
+    {
+        timeBlock.Id = Guid.NewGuid();
+        timeBlock.CreatedAt = DateTime.UtcNow;
+        timeBlock.UpdatedAt = DateTime.UtcNow;
+
+        await context.TimeBlocks.AddAsync(timeBlock);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task<bool> UpdateTimeBlockAsync(Guid id, UpdateTimeBlock updateRequest)
+    {
+        var existingTimeBlock = await context.TimeBlocks.FindAsync(id);
+        if (existingTimeBlock == null) return false;
+
+        if (updateRequest.StartDateTime.HasValue)
+            existingTimeBlock.StartDateTime = updateRequest.StartDateTime.Value;
+
+        if (updateRequest.EndDateTime.HasValue)
+            existingTimeBlock.EndDateTime = updateRequest.EndDateTime.Value;
+
+        if (updateRequest.Type.HasValue)
+            existingTimeBlock.Type = updateRequest.Type.Value;
+
+        if (updateRequest.Reason != null)
+            existingTimeBlock.Reason = updateRequest.Reason;
+
+        if (updateRequest.IsRecurring.HasValue)
+            existingTimeBlock.IsRecurring = updateRequest.IsRecurring.Value;
+
+        if (updateRequest.Pattern.HasValue)
+            existingTimeBlock.Pattern = updateRequest.Pattern.Value;
+
+        if (updateRequest.RecurringDays != null)
+            existingTimeBlock.RecurringDays = updateRequest.RecurringDays;
+
+        if (updateRequest.RecurrenceEndDate.HasValue)
+            existingTimeBlock.RecurrenceEndDate = updateRequest.RecurrenceEndDate.Value;
+
+        if (updateRequest.ExternalEventId != null)
+            existingTimeBlock.ExternalEventId = updateRequest.ExternalEventId;
+
+        existingTimeBlock.UpdatedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteTimeBlockAsync(Guid id)
+    {
+        var timeBlock = await context.TimeBlocks.FindAsync(id);
+        if (timeBlock == null) return false;
+
+        context.TimeBlocks.Remove(timeBlock);
+        await context.SaveChangesAsync();
+        return true;
+    }
+}

@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: appointments-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - appointments-network
+
+  user-service:
+    build:
+      context: ./services/user-service/src
+      dockerfile: UserService.Api/Dockerfile
+    container_name: appointments-user-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8000
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${USER_DB_NAME};Username=${USER_DB_USERNAME};Password=${USER_DB_PASSWORD}
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - appointments-network
+    restart: unless-stopped
+
+  user-service-migrator:
+    build:
+      context: ./services/user-service/src
+      dockerfile: UserService.DatabaseMigrator/Dockerfile
+    container_name: appointments-user-migrator
+    environment:
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${USER_DB_NAME};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - DATABASE_USERNAME=${USER_DB_USERNAME}
+      - DATABASE_PASSWORD=${USER_DB_PASSWORD}
+    profiles:
+      - migration
+    networks:
+      - appointments-network
+
+  service-catalog-service:
+    build:
+      context: ./services/service-catalog-service/src
+      dockerfile: ServiceCatalogService.Api/Dockerfile
+    container_name: appointments-service-catalog
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8000
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${SERVICE_DB_NAME};Username=${SERVICE_DB_USERNAME};Password=${SERVICE_DB_PASSWORD}
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - appointments-network
+    restart: unless-stopped
+
+  service-catalog-migrator:
+    build:
+      context: ./services/service-catalog-service/src
+      dockerfile: ServiceCatalogService.DatabaseMigrator/Dockerfile
+    container_name: appointments-service-catalog-migrator
+    environment:
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${SERVICE_DB_NAME};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - DATABASE_USERNAME=${SERVICE_DB_USERNAME}
+      - DATABASE_PASSWORD=${SERVICE_DB_PASSWORD}
+    profiles:
+      - migration
+    networks:
+      - appointments-network
+
+  availability-service:
+    build:
+      context: ./services/availability-service/src
+      dockerfile: AvailabilityService.Api/Dockerfile
+    container_name: appointments-availability-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8000
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${AVAILABILITY_DB_NAME};Username=${AVAILABILITY_DB_USERNAME};Password=${AVAILABILITY_DB_PASSWORD}
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - appointments-network
+    restart: unless-stopped
+
+  availability-service-migrator:
+    build:
+      context: ./services/availability-service/src
+      dockerfile: AvailabilityService.DatabaseMigrator/Dockerfile
+    container_name: appointments-availability-migrator
+    environment:
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${AVAILABILITY_DB_NAME};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - DATABASE_USERNAME=${AVAILABILITY_DB_USERNAME}
+      - DATABASE_PASSWORD=${AVAILABILITY_DB_PASSWORD}
+    profiles:
+      - migration
+    networks:
+      - appointments-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  appointments-network:
+    driver: bridge
