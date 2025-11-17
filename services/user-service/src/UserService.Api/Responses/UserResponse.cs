@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 using UserService.Database.Entities;
 using UserService.Database.Enums;
 
-namespace UserService.Api.Dtos;
+namespace UserService.Api.Responses;
 
 public class UserResponse
 {

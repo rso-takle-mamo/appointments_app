@@ -7,6 +7,7 @@ public class UserDbContext() : DbContext()
 {
     public DbSet<User> Users { get; set; }
     public DbSet<Tenant> Tenants { get; set; }
+    public DbSet<UserSession> UserSessions { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -20,21 +21,25 @@ public class UserDbContext() : DbContext()
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.ToTable("users");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.TenantId);
 
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.Username).HasColumnName("username").IsRequired().HasMaxLength(255);
-            entity.Property(e => e.Password).HasColumnName("password").IsRequired().HasMaxLength(255);
-            entity.Property(e => e.FirstName).HasColumnName("firstname").IsRequired().HasMaxLength(255);
-            entity.Property(e => e.LastName).HasColumnName("lastname").IsRequired().HasMaxLength(255);
-            entity.Property(e => e.Email).HasColumnName("email").IsRequired().HasMaxLength(255);
-            entity.Property(e => e.Role).HasColumnName("role");
-            entity.Property(e => e.TenantId).HasColumnName("tenantid");
-            entity.Property(e => e.CreatedAt).HasColumnName("createdat");
-            entity.Property(e => e.UpdatedAt).HasColumnName("updatedat");
+            entity.Property(e => e.Username)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.Password)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.FirstName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.LastName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.Email)
+                .IsRequired()
+                .HasMaxLength(255);
 
             entity.HasOne(u => u.Tenant)
                 .WithMany()
@@ -44,24 +49,38 @@ public class UserDbContext() : DbContext()
 
         modelBuilder.Entity<Tenant>(entity =>
         {
-            entity.ToTable("tenants");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.OwnerId).IsUnique();
 
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.OwnerId).HasColumnName("ownerid").IsRequired();
-            entity.Property(e => e.BusinessName).HasColumnName("businessname").IsRequired().HasMaxLength(255);
-            entity.Property(e => e.BusinessEmail).HasColumnName("businessemail").HasMaxLength(255);
-            entity.Property(e => e.BusinessPhone).HasColumnName("businessphone").HasMaxLength(50);
-            entity.Property(e => e.Address).HasColumnName("address").HasMaxLength(500);
-            entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.CreatedAt).HasColumnName("createdat");
-            entity.Property(e => e.UpdatedAt).HasColumnName("updatedat");
+            entity.Property(e => e.OwnerId)
+                .IsRequired();
+            entity.Property(e => e.BusinessName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.BusinessEmail)
+                .HasMaxLength(255);
+            entity.Property(e => e.BusinessPhone)
+                .HasMaxLength(50);
+            entity.Property(e => e.Address)
+                .HasMaxLength(500);
 
             entity.HasOne(t => t.Owner)
                 .WithOne()
                 .HasForeignKey<Tenant>(t => t.OwnerId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.TokenJti).IsUnique();
+            entity.HasIndex(e => e.ExpiresAt);
+
+            entity.HasOne(u => u.User)
+                .WithMany()
+                .HasForeignKey(u => u.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -1,9 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 using UserService.Database.Entities;
-using UserService.Database.Enums;
 
-namespace UserService.Api.Dtos;
+namespace UserService.Api.Requests;
 
 public class CreateUserRequest
 {
@@ -22,14 +20,11 @@ public class CreateUserRequest
     [Required]
     [StringLength(100, MinimumLength = 6)]
     public required string Password { get; set; }
-    
-    [Required]
-    [StringLength(100, MinimumLength = 3)]
-    public required string Email { get; set; }
 
     [Required]
-    [JsonConverter(typeof(JsonStringEnumConverter<UserRole>))]
-    public UserRole Role { get; set; }
+    [EmailAddress]
+    [StringLength(100, MinimumLength = 3)]
+    public required string Email { get; set; }
 
     public Guid? TenantId { get; set; }
 }

@@ -35,6 +35,27 @@ internal class UserRepository(UserDbContext context) : IUserRepository
         return await context.Users.AnyAsync(u => u.Username == username);
     }
 
+    public async Task<bool> VerifyPassword(string username, string password)
+    {
+        var user = await GetByUsername(username);
+        if (user == null) return false;
+
+        var passwordParts = user.Password.Split('|');
+        if (passwordParts.Length != 2) return false;
+
+        var salt = Convert.FromBase64String(passwordParts[0]);
+        var storedHash = passwordParts[1];
+
+        var computedHash = Convert.ToBase64String(KeyDerivation.Pbkdf2(
+            password: password,
+            salt: salt,
+            prf: KeyDerivationPrf.HMACSHA256,
+            iterationCount: 100000,
+            numBytesRequested: 256 / 8));
+
+        return computedHash == storedHash;
+    }
+
     private string HashPassword(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(128 / 8); // divide by 8 to convert bits to bytes

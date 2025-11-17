@@ -1,15 +1,17 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using UserService.Api.Dtos;
+using UserService.Api.Requests;
+using UserService.Api.Responses;
 using UserService.Api.Extensions;
 using UserService.Api.Validators;
 using UserService.Database.Entities;
+using UserService.Database.Enums;
 using UserService.Database.Repositories.Interfaces;
 
 namespace UserService.Api.Controllers;
 
 [ApiController]
 [Route("api/users")]
-public class UsersController(IUserRepository userRepository) : ControllerBase
+public class UsersController(IUserRepository userRepository, ITenantRepository tenantRepository) : ControllerBase
 {
     [HttpGet("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -20,19 +22,27 @@ public class UsersController(IUserRepository userRepository) : ControllerBase
         if (user == null) return NotFound();
         return Ok(user.ToResponse());
     }
-    
+
     [HttpPost]
     [ServiceFilter(typeof(ValidModelFilter))]
     [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Post([FromBody] CreateUserRequest createUserRequest)
     {
         if (await userRepository.UsernameExists(createUserRequest.Username))
         {
-            return BadRequest(new { Message = "Username already exists" });
+            throw new InvalidOperationException("Username already exists");
         }
-        
-        // TODO check that tenant exists
+
+        // Validate tenant if TenantId is provided
+        if (createUserRequest.TenantId.HasValue && !await tenantRepository.Exists(createUserRequest.TenantId.Value))
+        {
+            throw new InvalidOperationException("Tenant does not exist");
+        }
+
+        // Determine role based on tenant assignment
+        var role = createUserRequest.TenantId.HasValue ? UserRole.Provider : UserRole.Customer;
+
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -41,8 +51,10 @@ public class UsersController(IUserRepository userRepository) : ControllerBase
             Username = createUserRequest.Username,
             Password = createUserRequest.Password,
             Email = createUserRequest.Email,
-            Role = createUserRequest.Role,
-            TenantId = createUserRequest.TenantId
+            Role = role,
+            TenantId = createUserRequest.TenantId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         await userRepository.Create(user);

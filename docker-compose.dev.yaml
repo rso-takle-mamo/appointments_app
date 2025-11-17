@@ -30,6 +30,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${USER_DB_NAME};Username=${USER_DB_USERNAME};Password=${USER_DB_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     ports:
       - "8001:8000"
     depends_on:
@@ -48,6 +49,7 @@ services:
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${USER_DB_NAME};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       - DATABASE_USERNAME=${USER_DB_USERNAME}
       - DATABASE_PASSWORD=${USER_DB_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     profiles:
       - migration
     networks:

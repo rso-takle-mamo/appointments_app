@@ -8,4 +8,5 @@ public interface IUserRepository
     Task Create(User user);
     Task<User?> GetByUsername(string username);
     Task<bool> UsernameExists(string username);
+    Task<bool> VerifyPassword(string username, string password);
 }

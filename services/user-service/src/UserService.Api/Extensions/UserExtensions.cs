@@ -1,4 +1,4 @@
-using UserService.Api.Dtos;
+using UserService.Api.Responses;
 using UserService.Database.Entities;
 
 namespace UserService.Api.Extensions;
