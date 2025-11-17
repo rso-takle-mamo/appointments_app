@@ -35,6 +35,11 @@ internal class UserRepository(UserDbContext context) : IUserRepository
         return await context.Users.AnyAsync(u => u.Username == username);
     }
 
+    public async Task<bool> UsernameExistsExcept(Guid userId, string username)
+    {
+        return await context.Users.AnyAsync(u => u.Username == username && u.Id != userId);
+    }
+
     public async Task<bool> VerifyPassword(string username, string password)
     {
         var user = await GetByUsername(username);
@@ -54,6 +59,35 @@ internal class UserRepository(UserDbContext context) : IUserRepository
             numBytesRequested: 256 / 8));
 
         return computedHash == storedHash;
+    }
+
+    public async Task<User?> UpdateAsync(User user)
+    {
+        var existingUser = await context.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
+        if (existingUser == null) return null;
+
+        existingUser.Username = user.Username;
+        existingUser.FirstName = user.FirstName;
+        existingUser.LastName = user.LastName;
+        existingUser.Email = user.Email;
+        existingUser.TenantId = user.TenantId;
+        existingUser.UpdatedAt = DateTime.UtcNow;
+
+        // Note: Password and Role are typically updated through separate workflows
+        // for security reasons. Only update profile fields here.
+
+        await context.SaveChangesAsync();
+        return existingUser;
+    }
+
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user == null) return false;
+
+        context.Users.Remove(user);
+        await context.SaveChangesAsync();
+        return true;
     }
 
     private string HashPassword(string password)

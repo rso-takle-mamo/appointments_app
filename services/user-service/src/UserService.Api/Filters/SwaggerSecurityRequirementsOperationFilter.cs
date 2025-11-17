@@ -8,12 +8,19 @@ public class SwaggerSecurityRequirementsOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        var authorizeAttributes = context.MethodInfo
+        var methodAttributes = context.MethodInfo
             .GetCustomAttributes(true)
             .OfType<AuthorizeAttribute>()
             .ToList();
 
-        if (authorizeAttributes.Any())
+        var controllerAttributes = context.MethodInfo.DeclaringType?
+            .GetCustomAttributes(true)
+            .OfType<AuthorizeAttribute>()
+            .ToList() ?? [];
+
+        var allAuthorizeAttributes = methodAttributes.Concat(controllerAttributes).ToList();
+
+        if (allAuthorizeAttributes.Any())
         {
             operation.Security = new List<OpenApiSecurityRequirement>
             {
