@@ -16,6 +16,4 @@ public class UpdateUserRequest
     [EmailAddress(ErrorMessage = "Invalid email format")]
     [StringLength(255, ErrorMessage = "Email cannot exceed 255 characters")]
     public string? Email { get; set; }
-
-    public Guid? TenantId { get; set; }
 }

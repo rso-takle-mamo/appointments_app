@@ -40,11 +40,6 @@ public class UserDbContext() : DbContext()
             entity.Property(e => e.Email)
                 .IsRequired()
                 .HasMaxLength(255);
-
-            entity.HasOne(u => u.Tenant)
-                .WithMany()
-                .HasForeignKey(u => u.TenantId)
-                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Tenant>(entity =>
@@ -63,11 +58,6 @@ public class UserDbContext() : DbContext()
                 .HasMaxLength(50);
             entity.Property(e => e.Address)
                 .HasMaxLength(500);
-
-            entity.HasOne(t => t.Owner)
-                .WithOne()
-                .HasForeignKey<Tenant>(t => t.OwnerId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<UserSession>(entity =>
@@ -76,11 +66,6 @@ public class UserDbContext() : DbContext()
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.TokenJti).IsUnique();
             entity.HasIndex(e => e.ExpiresAt);
-
-            entity.HasOne(u => u.User)
-                .WithMany()
-                .HasForeignKey(u => u.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

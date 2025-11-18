@@ -6,6 +6,7 @@ namespace UserService.Api.Services;
 public interface IAuthService
 {
     Task<TokenResponse> LoginAsync(LoginRequest request);
-    Task<TokenResponse> RegisterAsync(RegisterRequest request);
+    Task<TokenResponse> RegisterCustomerAsync(CustomerRegisterRequest request);
+    Task<TokenResponse> RegisterProviderAsync(ProviderRegisterRequest request);
     Task LogoutAsync(string token);
 }

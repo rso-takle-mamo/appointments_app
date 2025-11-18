@@ -9,7 +9,7 @@ using System.Text.Json;
 using UserService.Api.Middleware;
 using UserService.Api.Services;
 using UserService.Api.Filters;
-using UserService.Api.Validators;
+using UserService.Api.Configuration;
 using UserService.Database;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,6 +22,8 @@ builder.Services.AddControllers(options =>
 }).AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+    options.JsonSerializerOptions.PropertyNameCaseInsensitive = false;
 });
 
 // Configure API behavior to suppress automatic model validation response
@@ -53,18 +55,19 @@ if (builder.Environment.IsDevelopment())
             Scheme = "bearer",
             BearerFormat = "JWT"
         });
-
-        // Add operation filter to handle security requirements per endpoint
-        c.OperationFilter<SwaggerSecurityRequirementsOperationFilter>();
+        
+        c.OperationFilter<AuthorizeOperationFilter>();
     });
 }
 
 builder.Configuration.AddEnvironmentVariables();
 
+// Configure JWT settings
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+
 // Add JWT Authentication
-var jwtKey = builder.Configuration["Jwt:Key"] ?? EnvironmentVariables.GetRequiredVariable("JWT_SECRET_KEY");
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "UserService";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "UserService";
+var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
+var jwtKey = !string.IsNullOrEmpty(jwtSettings.Key) ? jwtSettings.Key : EnvironmentVariables.GetRequiredVariable("JWT_SECRET_KEY");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -75,8 +78,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ClockSkew = TimeSpan.Zero
         };
@@ -84,10 +87,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Add database and health checks
 builder.Services.AddUserDatabase();
 
-// Add health checks
 builder.Services.AddHealthChecks()
     .AddCheck("self", () =>
     {

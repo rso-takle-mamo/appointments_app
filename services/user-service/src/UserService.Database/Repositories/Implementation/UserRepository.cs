@@ -73,9 +73,6 @@ internal class UserRepository(UserDbContext context) : IUserRepository
         existingUser.TenantId = user.TenantId;
         existingUser.UpdatedAt = DateTime.UtcNow;
 
-        // Note: Password and Role are typically updated through separate workflows
-        // for security reasons. Only update profile fields here.
-
         await context.SaveChangesAsync();
         return existingUser;
     }
@@ -89,12 +86,11 @@ internal class UserRepository(UserDbContext context) : IUserRepository
         await context.SaveChangesAsync();
         return true;
     }
-
+    
     private string HashPassword(string password)
     {
-        var salt = RandomNumberGenerator.GetBytes(128 / 8); // divide by 8 to convert bits to bytes
+        var salt = RandomNumberGenerator.GetBytes(128 / 8);
 
-        // derive a 256-bit subkey (use HMACSHA256 with 100,000 iterations)
         var hashed = Convert.ToBase64String(KeyDerivation.Pbkdf2(
             password: password,
             salt: salt,

@@ -1,6 +1,7 @@
-using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using UserService.Api.Models;
+using UserService.Api.Exceptions;
 
 namespace UserService.Api.Middleware;
 
@@ -15,82 +16,70 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
         catch (Exception exception)
         {
             var errorResponse = CreateErrorResponse(exception);
-            var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+            var statusCode = GetStatusCode(exception);
 
             logger.LogError(
-                "Error trace ID: {TraceId}, Type: {ErrorType}, Message: {Message}",
-                traceId,
+                "Exception: {ExceptionType}, Message: {ExceptionMessage}, StatusCode: {StatusCode}",
                 exception.GetType().Name,
-                exception.Message);
+                exception.Message,
+                statusCode);
 
-            context.Response.StatusCode = GetStatusCode(exception);
-            await context.Response.WriteAsJsonAsync(errorResponse);
+            context.Response.StatusCode = statusCode;
+            context.Response.ContentType = "application/json";
+
+            var responseJson = JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            await context.Response.WriteAsync(responseJson);
         }
     }
 
-    private static ErrorResponse CreateErrorResponse(Exception exception)
+    private static object CreateErrorResponse(Exception exception)
     {
         return exception switch
         {
-            InvalidOperationException ex => new ErrorResponse
-            {
-                Error = new Error
-                {
-                    Code = "CONFLICT",
-                    Message = ex.Message
-                }
-            },
-            ArgumentException ex => new ErrorResponse
-            {
-                Error = new Error
-                {
-                    Code = "INVALID_ARGUMENT",
-                    Message = ex.Message
-                }
-            },
-            DbUpdateException ex => new ErrorResponse
-            {
-                Error = new Error
-                {
-                    Code = "DATABASE_ERROR",
-                    Message = ex.InnerException?.Message ?? ex.Message
-                }
-            },
-            KeyNotFoundException ex => new ErrorResponse
-            {
-                Error = new Error
-                {
-                    Code = "NOT_FOUND",
-                    Message = ex.Message
-                }
-            },
-            UnauthorizedAccessException ex => new ErrorResponse
-            {
-                Error = new Error
-                {
-                    Code = "UNAUTHORIZED",
-                    Message = ex.Message
-                }
-            },
-            _ => new ErrorResponse
-            {
-                Error = new Error
-                {
-                    Code = "INTERNAL_SERVER_ERROR",
-                    Message = "An internal server error occurred."
-                }
-            }
+            // Custom domain exceptions
+            ValidationException ex => ErrorResponses.CreateValidation(
+                $"Validation failed with {ex.ValidationErrors?.Count ?? 0} error(s).",
+                ex.ValidationErrors ?? new List<ValidationError>()
+            ),
+            NotFoundException ex => ErrorResponses.Create(
+                ex.ErrorCode,
+                ex.Message,
+                ex.ResourceType ?? "Resource",
+                ex.ResourceId
+            ),
+            ConflictException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+            AuthenticationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+            AuthorizationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+            DatabaseOperationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+
+            // Database exceptions
+            DbUpdateException ex => ErrorResponses.Create(
+                "DATABASE_ERROR",
+                ex.InnerException?.Message ?? ex.Message
+            ),
+
+            _ => ErrorResponses.Create("INTERNAL_SERVER_ERROR", "An internal server error occurred.")
         };
     }
 
     private static int GetStatusCode(Exception exception) =>
         exception switch
         {
-            InvalidOperationException => StatusCodes.Status409Conflict,
-            ArgumentException => StatusCodes.Status400BadRequest,
+            // Custom domain exceptions
+            ValidationException => StatusCodes.Status400BadRequest,
+            NotFoundException => StatusCodes.Status404NotFound,
+            ConflictException => StatusCodes.Status409Conflict,
+            AuthenticationException => StatusCodes.Status401Unauthorized,
+            AuthorizationException => StatusCodes.Status403Forbidden,
+            DatabaseOperationException => StatusCodes.Status500InternalServerError,
+
+            // Database exceptions
             DbUpdateException => StatusCodes.Status400BadRequest,
-            KeyNotFoundException => StatusCodes.Status404NotFound,
-            UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+
             _ => StatusCodes.Status500InternalServerError
         };
 }

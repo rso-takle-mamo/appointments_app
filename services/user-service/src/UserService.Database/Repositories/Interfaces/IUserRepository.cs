@@ -1,4 +1,5 @@
-﻿using UserService.Database.Entities;
+﻿using Microsoft.EntityFrameworkCore;
+using UserService.Database.Entities;
 
 namespace UserService.Database.Repositories.Interfaces;
 

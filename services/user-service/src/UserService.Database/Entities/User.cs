@@ -23,7 +23,4 @@ public class User
     public DateTime CreatedAt { get; set; }
     
     public DateTime UpdatedAt { get; set; }
-
-    // Navigation property
-    public virtual Tenant? Tenant { get; set; }
 }

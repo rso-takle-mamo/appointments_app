@@ -19,12 +19,10 @@ internal class UserSessionRepository(UserDbContext context) : IUserSessionReposi
         return session;
     }
 
-    public async Task<UserSession?> UpdateAsync(UserSession session)
-    {
-        context.UserSessions.Update(session);
-        await context.SaveChangesAsync();
-        return session;
-    }
+    // Unused methods removed:
+    // public async Task<UserSession?> UpdateAsync(UserSession session)
+    // public async Task<IEnumerable<UserSession>> GetExpiredSessionsAsync(DateTime beforeDate)
+    // public async Task<int> DeleteExpiredSessionsAsync(DateTime beforeDate)
 
     public async Task<bool> InvalidateByJtiAsync(string tokenJti)
     {
@@ -47,21 +45,5 @@ internal class UserSessionRepository(UserDbContext context) : IUserSessionReposi
         context.UserSessions.RemoveRange(sessions);
         await context.SaveChangesAsync();
         return sessions.Count > 0;
-    }
-
-    public async Task<IEnumerable<UserSession>> GetExpiredSessionsAsync(DateTime beforeDate)
-    {
-        return await context.UserSessions
-            .Where(s => s.ExpiresAt < beforeDate)
-            .ToListAsync();
-    }
-
-    public async Task<int> DeleteExpiredSessionsAsync(DateTime beforeDate)
-    {
-        var expiredSessions = context.UserSessions
-            .Where(s => s.ExpiresAt < beforeDate);
-
-        context.UserSessions.RemoveRange(expiredSessions);
-        return await context.SaveChangesAsync();
     }
 }

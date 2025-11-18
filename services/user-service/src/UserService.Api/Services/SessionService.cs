@@ -39,14 +39,4 @@ public class SessionService(IUserSessionRepository sessionRepository) : ISession
     {
         return await sessionRepository.InvalidateByUserIdAsync(userId);
     }
-
-    public async Task CleanupExpiredSessionsAsync()
-    {
-        var expiredSessions = await sessionRepository.GetExpiredSessionsAsync(DateTime.UtcNow);
-
-        if (expiredSessions.Any())
-        {
-            await sessionRepository.DeleteExpiredSessionsAsync(DateTime.UtcNow);
-        }
-    }
 }

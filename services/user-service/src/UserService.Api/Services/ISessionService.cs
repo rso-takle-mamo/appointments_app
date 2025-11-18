@@ -9,5 +9,4 @@ public interface ISessionService
     Task<bool> IsSessionActiveAsync(string tokenJti);
     Task<bool> InvalidateSessionAsync(string tokenJti);
     Task<bool> InvalidateUserSessionsAsync(Guid userId);
-    Task CleanupExpiredSessionsAsync();
 }

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Runtime.CompilerServices;
+using UserService.Api.Exceptions;
+using UserService.Api.Models;
 
 namespace UserService.Api.Filters;
 
@@ -10,13 +12,16 @@ public class ModelValidationFilter : ActionFilterAttribute
     {
         if (!context.ModelState.IsValid)
         {
-            var errors = context.ModelState
+            var validationErrors = context.ModelState
                 .Where(x => x.Value?.Errors.Count > 0)
-                .SelectMany(x => x.Value!.Errors)
-                .Select(x => x.ErrorMessage)
+                .SelectMany(x => x.Value!.Errors.Select(error => new ValidationError
+                {
+                    Field = x.Key == "" ? "Request body" : x.Key,
+                    Message = error.ErrorMessage
+                }))
                 .ToList();
 
-            throw new ArgumentException(string.Join(" ", errors));
+            throw new ValidationException(validationErrors);
         }
 
         base.OnActionExecuting(context);

@@ -12,17 +12,9 @@ internal class TenantRepository(UserDbContext context) : ITenantRepository
             .FirstOrDefaultAsync(t => t.Id == id);
     }
 
-    public async Task<bool> Exists(Guid id)
-    {
-        return await context.Tenants
-            .AnyAsync(t => t.Id == id);
-    }
-
-    public async Task<Tenant?> GetByOwnerId(Guid ownerId)
-    {
-        return await context.Tenants
-            .FirstOrDefaultAsync(t => t.OwnerId == ownerId);
-    }
+    // Unused methods removed:
+    // public async Task<bool> Exists(Guid id)
+    // public async Task<Tenant?> GetByOwnerId(Guid ownerId)
 
     public async Task<Tenant> CreateAsync(Tenant tenant)
     {
