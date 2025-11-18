@@ -12,10 +12,6 @@ internal class TenantRepository(UserDbContext context) : ITenantRepository
             .FirstOrDefaultAsync(t => t.Id == id);
     }
 
-    // Unused methods removed:
-    // public async Task<bool> Exists(Guid id)
-    // public async Task<Tenant?> GetByOwnerId(Guid ownerId)
-
     public async Task<Tenant> CreateAsync(Tenant tenant)
     {
         tenant.CreatedAt = DateTime.UtcNow;

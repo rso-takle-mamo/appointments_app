@@ -4,9 +4,6 @@ namespace ServiceCatalogService.Api.Requests;
 
 public class CreateServiceRequest
 {
-    [Required(ErrorMessage = "Tenant ID is required")]
-    public Guid TenantId { get; set; }
-
     [Required(ErrorMessage = "Service name is required")]
     [MaxLength(255, ErrorMessage = "Service name cannot exceed 255 characters")]
     [RegularExpression(@"^[a-zA-Z0-9\s\-\.]+$", ErrorMessage = "Service name can only contain letters, numbers, spaces, hyphens, and periods")]

@@ -1,103 +1,200 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using ServiceCatalogService.Api.Responses;
 using ServiceCatalogService.Api.Extensions;
 using ServiceCatalogService.Api.Requests;
-using ServiceCatalogService.Database.Models;
+using ServiceCatalogService.Api.Services;
+using ServiceCatalogService.Api.Exceptions;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
 
 namespace ServiceCatalogService.Api.Controllers;
 
-[Route("api/services/categories")]
+[Route("api/categories")]
 [ApiController]
-public class CategoriesController(ICategoryRepository categoryRepository) : ControllerBase
+public class CategoriesController(ICategoryRepository categoryRepository, IUserContextService userContextService) : ControllerBase
 {
-    [HttpGet]
-    public async Task<ActionResult<PaginatedResponse<CategoryResponse>>> GetCategories(
-        [FromQuery] int offset = 0,
-        [FromQuery] int limit = 100,
-        [FromQuery] Guid? tenantId = null)
+    /// <summary>
+    /// Get category of a specific service
+    /// </summary>
+    /// <remarks>
+    /// **Customers only**: Retrieves the category associated with a specific service.
+    /// </remarks>
+    /// <param name="serviceId">The unique identifier of the service</param>
+    /// <returns>Category information associated with the service</returns>
+    /// <response code="200">Successfully retrieved category information</response>
+    /// <response code="401">User not authenticated</response>
+    /// <response code="403">User is not a Customer (Providers not allowed)</response>
+    /// <response code="404">Service not found or service has no assigned category</response>
+    [HttpGet("/api/services/{serviceId}/category")]
+    [Authorize]
+    public async Task<ActionResult<CategoryResponse>> GetServiceCategory(Guid serviceId)
     {
-        if (offset < 0)
+        if (!userContextService.IsCustomer())
         {
-            throw new ArgumentException("Offset must be greater than or equal to 0");
+            throw new AuthorizationException("Category", "read", "Access denied. Only customers can access service category information.");
         }
 
-        if (limit is < 1 or > 100)
-        {
-            throw new ArgumentException("Limit must be between 1 and 100");
-        }
-
-        var parameters = new PaginationParameters
-        {
-            Offset = offset,
-            Limit = limit
-        };
-
-        var (categories, totalCount) = await categoryRepository.GetCategoriesAsync(parameters, tenantId);
-
-        var response = new PaginatedResponse<CategoryResponse>
-        {
-            Offset = offset,
-            Limit = limit,
-            TotalCount = totalCount,
-            Data = categories.Select(c => c.ToCategoryResponse()).ToList()
-        };
-
-        return Ok(response);
+        var category = await categoryRepository.GetCategoryByServiceIdAsync(serviceId);
+        return category == null ? throw new NotFoundException("Category", $"No category found for service {serviceId}") : Ok(category.ToCategoryResponse());
     }
 
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<CategoryResponse>> GetCategory(Guid id)
+    /// <summary>
+    /// Get all categories for a specific tenant
+    /// </summary>
+    /// <remarks>
+    /// **Customers only**: Retrieves all categories belonging to a specific tenant/organization.
+    /// </remarks>
+    /// <param name="tenantId">The unique identifier of the tenant/organization</param>
+    /// <returns>List of all categories belonging to the specified tenant</returns>
+    /// <response code="200">Successfully retrieved categories list</response>
+    /// <response code="401">User not authenticated</response>
+    /// <response code="403">User is not a Customer (Providers not allowed)</response>
+    [HttpGet("/api/tenants/{tenantId}/categories")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<CategoryResponse>>> GetTenantCategories(Guid tenantId)
     {
-        var category = await categoryRepository.GetCategoryByIdAsync(id);
+        if (!userContextService.IsCustomer())
+        {
+            throw new AuthorizationException("Category", "read", "Access denied. Only customers can access tenant categories.");
+        }
+
+        var categories = await categoryRepository.GetCategoriesByTenantIdAsync(tenantId);
+        return Ok(categories.Select(c => c.ToCategoryResponse()));
+    }
+
+    /// <summary>
+    /// Get all categories belonging to the authenticated provider
+    /// </summary>
+    /// <remarks>
+    /// **Providers only**: Retrieves all categories managed by the authenticated provider.
+    /// </remarks>
+    /// <returns>List of categories belonging to the authenticated provider's tenant</returns>
+    /// <response code="200">Successfully retrieved provider's categories</response>
+    /// <response code="401">User not authenticated</response>
+    /// <response code="403">User is not a Provider (Customers not allowed)</response>
+    [HttpGet]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<CategoryResponse>>> GetProviderCategories()
+    {
+        userContextService.ValidateProviderAccess();
+        var tenantId = userContextService.GetTenantId();
+        var categories = await categoryRepository.GetCategoriesByTenantIdAsync(tenantId);
+        return Ok(categories.Select(c => c.ToCategoryResponse()));
+    }
+
+    /// <summary>
+    /// Get category by ID - Providers only
+    /// </summary>
+    [HttpGet("{categoryId:guid}")]
+    [Authorize]
+    public async Task<ActionResult<CategoryResponse>> GetCategory(Guid categoryId)
+    {
+        userContextService.ValidateProviderAccess();
+        var category = await categoryRepository.GetCategoryByIdAsync(categoryId);
 
         if (category == null)
         {
-            return NotFound();
+            throw new NotFoundException("Category", categoryId);
         }
 
+        userContextService.ValidateTenantAccess(category.TenantId, "Category");
         return Ok(category.ToCategoryResponse());
     }
 
+    /// <summary>
+    /// Create a new category
+    /// </summary>
+    /// <remarks>
+    /// **Providers only**: Creates a new category within the provider's tenant.
+    /// </remarks>
+    /// <param name="request">Category creation details including name and description</param>
+    /// <returns>Created category information with location header</returns>
+    /// <response code="201">Category successfully created</response>
+    /// <response code="400">Invalid request data (missing name, etc.)</response>
+    /// <response code="401">User not authenticated</response>
+    /// <response code="403">User is not a Provider</response>
+    /// <response code="409">Category name already exists in this tenant</response>
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<CategoryResponse>> CreateCategory([FromBody] CreateCategoryRequest request)
     {
-        var category = request.ToEntity();
-        await categoryRepository.CreateCategoryAsync(category);
-        var response = category.ToCategoryResponse();
-        return CreatedAtAction(nameof(GetCategory), new { id = response.Id }, response);
-    }
+        userContextService.ValidateProviderAccess();
+        var tenantId = userContextService.GetTenantId();
+        var category = request.ToEntity(tenantId);
+        category.Id = Guid.NewGuid();
 
-    [HttpPatch("{id:guid}")]
-    public async Task<ActionResult<CategoryResponse>> UpdateCategory(Guid id, [FromBody] UpdateCategoryRequest request)
-    {
-        var updateRequest = new UpdateCategory
+        var existingCategory = await categoryRepository.GetCategoryByNameAndTenantAsync(category.Name, tenantId);
+        if (existingCategory != null)
         {
-            Description = request.Description,
-            Name = request.Name,
-        };
-        var success = await categoryRepository.UpdateCategoryAsync(id, updateRequest);
-
-        if (!success)
-        {
-            return NotFound();
+            throw new ConflictException("DuplicateCategoryName", $"A category with name '{category.Name}' already exists in this tenant.");
         }
 
-        var updatedCategory = await categoryRepository.GetCategoryByIdAsync(id);
+        await categoryRepository.CreateCategoryAsync(category);
+        var response = category.ToCategoryResponse();
+        return CreatedAtAction(nameof(GetCategory), new { categoryId = response.Id }, response);
+    }
+
+    /// <summary>
+    /// Update category - Providers only (names must remain unique within tenant)
+    /// </summary>
+    [HttpPatch("{categoryId:guid}")]
+    [Authorize]
+    public async Task<ActionResult<CategoryResponse>> UpdateCategory(Guid categoryId, [FromBody] UpdateCategoryRequest request)
+    {
+        userContextService.ValidateProviderAccess();
+        var existingCategory = await categoryRepository.GetCategoryByIdAsync(categoryId);
+
+        if (existingCategory == null)
+        {
+            throw new NotFoundException("Category", categoryId);
+        }
+
+        userContextService.ValidateTenantAccess(existingCategory.TenantId, "Category");
+
+        if (!string.IsNullOrEmpty(request.Name) && request.Name != existingCategory.Name)
+        {
+            var duplicateCategory = await categoryRepository.GetCategoryByNameAndTenantAsync(request.Name, existingCategory.TenantId);
+            if (duplicateCategory != null && duplicateCategory.Id != categoryId)
+            {
+                throw new ConflictException("DuplicateCategoryName", $"A category with name '{request.Name}' already exists in this tenant.");
+            }
+        }
+
+        var updateRequest = new UpdateCategory
+        {
+            Name = request.Name ?? existingCategory.Name,
+            Description = request.Description ?? existingCategory.Description
+        };
+
+        var success = await categoryRepository.UpdateCategoryAsync(categoryId, updateRequest);
+        if (!success)
+        {
+            throw new DatabaseOperationException("Update", "Category", "Failed to update category");
+        }
+
+        var updatedCategory = await categoryRepository.GetCategoryByIdAsync(categoryId);
         return Ok(updatedCategory!.ToCategoryResponse());
     }
 
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> DeleteCategory(Guid id)
+    /// <summary>
+    /// Delete category - Providers only (services will have null CategoryId)
+    /// </summary>
+    [HttpDelete("{categoryId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteCategory(Guid categoryId)
     {
-        var success = await categoryRepository.DeleteCategoryAsync(id);
+        userContextService.ValidateProviderAccess();
+        var existingCategory = await categoryRepository.GetCategoryByIdAsync(categoryId);
 
-        if (!success)
+        if (existingCategory == null)
         {
-            return NotFound();
+            throw new NotFoundException("Category", categoryId);
         }
 
-        return NoContent();
+        userContextService.ValidateTenantAccess(existingCategory.TenantId, "Category");
+        var success = await categoryRepository.DeleteCategoryAsync(categoryId);
+
+        return !success ? throw new DatabaseOperationException("Delete", "Category", "Failed to delete category") : NoContent();
     }
 }

@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using ServiceCatalogService.Database.Entities;
-using ServiceCatalogService.Database.Models;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
 
@@ -8,31 +7,32 @@ namespace ServiceCatalogService.Database.Repositories.Implementation;
 
 public class CategoryRepository(ServiceCatalogDbContext context) : ICategoryRepository
 {
-    public async Task<(IEnumerable<Category> Categories, int TotalCount)> GetCategoriesAsync(PaginationParameters parameters, Guid? tenantId = null)
+    public async Task<Category?> GetCategoryByServiceIdAsync(Guid serviceId)
     {
-        var query = context.Categories
-            .AsNoTracking()
-            .AsQueryable();
-
-        if (tenantId.HasValue)
-        {
-            query = query.Where(c => c.TenantId == tenantId.Value);
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var categories = await query
-            .OrderBy(c => c.Name)
-            .Skip(parameters.Offset)
-            .Take(parameters.Limit)
-            .ToListAsync();
-
-        return (categories, totalCount);
+        return await context.Services
+            .Where(s => s.Id == serviceId)
+            .Select(s => s.Category)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<Category?> GetCategoryByIdAsync(Guid id)
     {
         return await context.Categories.FindAsync(id);
+    }
+
+    public async Task<Category?> GetCategoryByNameAndTenantAsync(string name, Guid tenantId)
+    {
+        return await context.Categories
+            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Name == name);
+    }
+
+  
+    public async Task<IReadOnlyCollection<Category>> GetCategoriesByTenantIdAsync(Guid tenantId)
+    {
+        return await context.Categories
+            .Where(c => c.TenantId == tenantId)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
     }
 
     public async Task CreateCategoryAsync(Category category)
@@ -44,24 +44,24 @@ public class CategoryRepository(ServiceCatalogDbContext context) : ICategoryRepo
         await context.SaveChangesAsync();
     }
 
-    public async Task<bool> UpdateCategoryAsync(Guid id, UpdateCategory request)
+    public async Task<bool> UpdateCategoryAsync(Guid id, UpdateCategory updateRequest)
     {
-        var category = await context.Categories.FindAsync(id);
+        var category = await GetCategoryByIdAsync(id);
         if (category == null)
         {
             return false;
         }
 
-        if (!string.IsNullOrEmpty(request.Name))
+        if (!string.IsNullOrEmpty(updateRequest.Name))
         {
-            category.Name = request.Name;
+            category.Name = updateRequest.Name;
         }
 
-        if (request.Description != null)
+        if (updateRequest.Description != null)
         {
-            category.Description = request.Description;
+            category.Description = updateRequest.Description;
         }
-        
+
         category.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
         return true;
@@ -69,7 +69,7 @@ public class CategoryRepository(ServiceCatalogDbContext context) : ICategoryRepo
 
     public async Task<bool> DeleteCategoryAsync(Guid id)
     {
-        var category = await context.Categories.FindAsync(id);
+        var category = await GetCategoryByIdAsync(id);
         if (category == null)
         {
             return false;
@@ -77,7 +77,6 @@ public class CategoryRepository(ServiceCatalogDbContext context) : ICategoryRepo
 
         context.Categories.Remove(category);
         await context.SaveChangesAsync();
-
         return true;
     }
 }

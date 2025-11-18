@@ -37,21 +37,21 @@ public static class MappingExtensions
         };
     }
 
-    public static Category ToEntity(this CreateCategoryRequest request)
+    public static Category ToEntity(this CreateCategoryRequest request, Guid tenantId)
     {
         return new Category
         {
-            TenantId = request.TenantId,
+            TenantId = tenantId,
             Name = request.Name,
             Description = request.Description
         };
     }
 
-    public static Service ToEntity(this CreateServiceRequest request)
+    public static Service ToEntity(this CreateServiceRequest request, Guid tenantId)
     {
         return new Service
         {
-            TenantId = request.TenantId,
+            TenantId = tenantId,
             Name = request.Name,
             Description = request.Description,
             Price = request.Price,

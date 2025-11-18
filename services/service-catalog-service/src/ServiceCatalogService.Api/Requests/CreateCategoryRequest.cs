@@ -4,9 +4,6 @@ namespace ServiceCatalogService.Api.Requests;
 
 public class CreateCategoryRequest
 {
-    [Required(ErrorMessage = "Tenant ID is required")]
-    public Guid TenantId { get; set; }
-
     [Required(ErrorMessage = "Category name is required")]
     [MinLength(2, ErrorMessage = "Category name must be at least 2 characters")]
     [MaxLength(100, ErrorMessage = "Category name cannot exceed 100 characters")]

@@ -6,8 +6,10 @@ namespace ServiceCatalogService.Database.Repositories.Interfaces;
 
 public interface ICategoryRepository
 {
-    Task<(IEnumerable<Category> Categories, int TotalCount)> GetCategoriesAsync(PaginationParameters parameters, Guid? tenantId = null);
+    Task<Category?> GetCategoryByServiceIdAsync(Guid serviceId);
     Task<Category?> GetCategoryByIdAsync(Guid id);
+    Task<Category?> GetCategoryByNameAndTenantAsync(string name, Guid tenantId);
+    Task<IReadOnlyCollection<Category>> GetCategoriesByTenantIdAsync(Guid tenantId);
     Task CreateCategoryAsync(Category category);
     Task<bool> UpdateCategoryAsync(Guid id, UpdateCategory updateRequest);
     Task<bool> DeleteCategoryAsync(Guid id);

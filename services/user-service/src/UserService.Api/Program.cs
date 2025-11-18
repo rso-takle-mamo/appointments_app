@@ -108,9 +108,6 @@ builder.Services.AddHealthChecks()
         failureStatus: HealthStatus.Unhealthy,
         tags: ["db", "postgresql"]);
 
-// Register middleware
-builder.Services.AddTransient<GlobalExceptionHandler>();
-
 // Register filters
 builder.Services.AddScoped<ModelValidationFilter>();
 

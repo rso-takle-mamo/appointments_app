@@ -2,20 +2,62 @@ namespace ServiceCatalogService.Api.Models;
 
 public class ErrorResponse
 {
-    public Error Error { get; set; } = new Error();
+    public required Error Error { get; set; }
+}
+
+public class ValidationErrorResponse : ErrorResponse
+{
+    public required List<ValidationError> ValidationErrors { get; set; }
 }
 
 public class Error
 {
-    public string Code { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    
-    public List<ErrorDetail> Details { get; set; } = new List<ErrorDetail>();
+    public required string Code { get; set; }
+    public required string Message { get; set; }
+
+    public string? ResourceType { get; set; }
+    public object? ResourceId { get; set; }
     public string? TraceId { get; set; }
 }
 
-public class ErrorDetail
+public static class ErrorResponses
 {
-    public string Field { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
+    public static ErrorResponse Create(string code, string message)
+    {
+        return new ErrorResponse
+        {
+            Error = new Error
+            {
+                Code = code,
+                Message = message
+            }
+        };
+    }
+
+    public static ErrorResponse Create(string code, string message, string resourceType, object? resourceId)
+    {
+        return new ErrorResponse
+        {
+            Error = new Error
+            {
+                Code = code,
+                Message = message,
+                ResourceType = resourceType,
+                ResourceId = resourceId
+            }
+        };
+    }
+
+    public static ValidationErrorResponse CreateValidation(string message, List<ValidationError> validationErrors)
+    {
+        return new ValidationErrorResponse
+        {
+            Error = new Error
+            {
+                Code = "VALIDATION_ERROR",
+                Message = message
+            },
+            ValidationErrors = validationErrors
+        };
+    }
 }

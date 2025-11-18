@@ -8,16 +8,47 @@ namespace ServiceCatalogService.Database.Repositories.Implementation;
 
 public class ServiceRepository(ServiceCatalogDbContext context) : IServiceRepository
 {
-    public async Task<(IReadOnlyCollection<Service> Services, int TotalCount)> GetServicesAsync(PaginationParameters parameters, Guid? tenantId = null)
+    public async Task<(IReadOnlyCollection<Service> Services, int TotalCount)> GetServicesAsync(PaginationParameters parameters, ServiceFilterParameters filters)
     {
         var query = context.Services
             .Include(s => s.Category)
             .AsNoTracking()
             .AsQueryable();
 
-        if (tenantId.HasValue)
+        // Apply all filters
+        if (filters.TenantId.HasValue)
         {
-            query = query.Where(s => s.TenantId == tenantId.Value);
+            query = query.Where(s => s.TenantId == filters.TenantId.Value);
+        }
+
+        if (filters.MinPrice.HasValue)
+        {
+            query = query.Where(s => s.Price >= filters.MinPrice.Value);
+        }
+
+        if (filters.MaxPrice.HasValue)
+        {
+            query = query.Where(s => s.Price <= filters.MaxPrice.Value);
+        }
+
+        if (filters.MaxDuration.HasValue)
+        {
+            query = query.Where(s => s.DurationMinutes <= filters.MaxDuration.Value);
+        }
+
+        if (filters.CategoryId.HasValue)
+        {
+            query = query.Where(s => s.CategoryId == filters.CategoryId.Value);
+        }
+
+        if (!string.IsNullOrEmpty(filters.CategoryName))
+        {
+            query = query.Where(s => s.Category != null && EF.Functions.ILike(s.Category.Name, $"%{filters.CategoryName}%"));
+        }
+
+        if (filters.IsActive.HasValue)
+        {
+            query = query.Where(s => s.IsActive == filters.IsActive.Value);
         }
 
         var totalCount = await query.CountAsync();
@@ -38,6 +69,8 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
+    
+    
     public async Task CreateServiceAsync(Service service)
     {
         service.Id = Guid.NewGuid();
