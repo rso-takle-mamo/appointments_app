@@ -42,8 +42,8 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
         {
             // Custom domain exceptions
             ValidationException ex => ErrorResponses.CreateValidation(
-                $"Validation failed with {ex.ValidationErrors?.Count ?? 0} error(s).",
-                ex.ValidationErrors ?? new List<ValidationError>()
+                $"Validation failed with {ex.ValidationErrors.Count} field(s).",
+                ex.ValidationErrors
             ),
             NotFoundException ex => ErrorResponses.Create(
                 ex.ErrorCode,

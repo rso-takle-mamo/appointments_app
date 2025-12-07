@@ -5,15 +5,11 @@ using UserService.Api.Exceptions;
 using UserService.Database.Entities;
 using UserService.Database.Enums;
 using UserService.Database.Repositories.Interfaces;
-using UserService.Database;
 
 namespace UserService.Api.Services;
 
 public class UserService(
-    IUserRepository userRepository,
-    ITenantRepository tenantRepository,
-    ISessionService sessionService,
-    UserDbContext dbContext
+    IUserRepository userRepository
 ) : IUserService
 {
     public async Task<UserResponse> GetProfileAsync(Guid userId)
@@ -75,37 +71,11 @@ public class UserService(
             throw new NotFoundException("User", userId);
         }
 
-        using var transaction = await dbContext.Database.BeginTransactionAsync();
-
-        try
+        // Delete the user - cascade deletes handle related sessions and tenant
+        var deleted = await userRepository.DeleteAsync(userId);
+        if (!deleted)
         {
-            // Invalidate all user sessions
-            await sessionService.InvalidateUserSessionsAsync(userId);
-
-            // Delete tenant if user is a provider
-            if (user is { Role: UserRole.Provider, TenantId: not null })
-            {
-                var tenantDeleted = await tenantRepository.DeleteAsync(user.TenantId.Value);
-                if (!tenantDeleted)
-                {
-                    throw new DatabaseOperationException("delete", "Tenant", "Failed to delete tenant for provider");
-                }
-            }
-
-            // Delete the user
-            var deleted = await userRepository.DeleteAsync(userId);
-            if (!deleted)
-            {
-                throw new DatabaseOperationException("delete", "User", "Failed to delete user account");
-            }
-
-            await transaction.CommitAsync();
-        }
-        catch (Exception)
-        {
-            // Rollback transaction if any step fails
-            await transaction.RollbackAsync();
-            throw;
+            throw new DatabaseOperationException("delete", "User", "Failed to delete user account");
         }
     }
 }

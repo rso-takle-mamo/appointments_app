@@ -34,7 +34,6 @@ public class AvailabilityDbContext : DbContext
             entity.Property(e => e.Day).IsRequired();
             entity.Property(e => e.StartTime).IsRequired();
             entity.Property(e => e.EndTime).IsRequired();
-            entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.MaxConcurrentBookings).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
@@ -53,13 +52,16 @@ public class AvailabilityDbContext : DbContext
             entity.Property(e => e.EndDateTime).IsRequired();
             entity.Property(e => e.Type).IsRequired();
             entity.Property(e => e.Reason);
-            entity.Property(e => e.IsRecurring).IsRequired();
-            entity.Property(e => e.Pattern).IsRequired();
-            entity.Property(e => e.RecurringDays);
-            entity.Property(e => e.RecurrenceEndDate);
             entity.Property(e => e.ExternalEventId);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
+
+            // Configure RecurrencePattern as JSON column
+            entity.Property(e => e.RecurrencePattern)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    v => v == null ? null : System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => string.IsNullOrEmpty(v) ? null : System.Text.Json.JsonSerializer.Deserialize<RecurrencePattern>(v, (System.Text.Json.JsonSerializerOptions?)null));
 
             entity.HasIndex(e => new { e.TenantId, e.StartDateTime });
             entity.HasIndex(e => new { e.TenantId, e.EndDateTime });
@@ -104,12 +106,18 @@ public class AvailabilityDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.TenantId).IsRequired();
+            entity.Property(e => e.CategoryId);
             entity.Property(e => e.BeforeMinutes).IsRequired();
             entity.Property(e => e.AfterMinutes).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
 
-            entity.HasIndex(e => e.TenantId).IsUnique();
+            // Unique constraint on (TenantId, CategoryId) where CategoryId can be null for global buffer times
+            entity.HasIndex(e => new { e.TenantId, e.CategoryId }).IsUnique();
+
+            // CategoryId is a reference to ServiceCatalog.Categories
+            // Note: Since Categories are in a different service, we don't create a real FK constraint
+            // We'll validate CategoryId existence at the application level
         });
 
         // TenantSettings configuration

@@ -5,6 +5,7 @@ using ServiceCatalogService.Api.Extensions;
 using ServiceCatalogService.Api.Requests;
 using ServiceCatalogService.Api.Services;
 using ServiceCatalogService.Api.Exceptions;
+using ServiceCatalogService.Database.Enums;
 using ServiceCatalogService.Database.Models;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
@@ -16,35 +17,40 @@ namespace ServiceCatalogService.Api.Controllers;
 public class ServicesController(IServiceRepository serviceRepository, IUserContextService userContextService) : ControllerBase
 {
     /// <summary>
-    /// Get services with filtering and pagination - Role-based behavior
+    /// Get services with filtering and pagination
     /// </summary>
     /// <remarks>
-    /// **Different behavior based on user role:**
-    ///
     /// **CUSTOMERS:**
-    /// - Access services from ALL tenants
-    /// - Filtering: tenantId, minPrice, maxPrice, maxDuration, categoryId, categoryName, isActive
-    /// - Search across entire service catalog
+    /// - Access to services from ALL tenants
     ///
     /// **PROVIDERS:**
-    /// - Access ONLY services from their own tenant
-    /// - Limited filtering: isActive only (tenant automatically enforced)
-    /// - Cannot access other providers' services
+    /// - Access ONLY to services from their own tenant
+    /// - Setting tenantId in query is NOT allowed
     /// </remarks>
-    /// <param name="request">Service filtering and pagination parameters</param>
-    /// <returns>Paginated list of services based on user role and filters</returns>
-    /// <response code="200">Services retrieved successfully with pagination info</response>
-    /// <response code="401">User not authenticated</response>
     [HttpGet]
     [Authorize]
     public async Task<ActionResult<PaginatedResponse<ServiceResponse>>> GetServices([FromQuery] ServiceFilterRequest request)
     {
+        // Customer-only filters validation
+        if (!userContextService.IsCustomer())
+        {
+            if (!string.IsNullOrEmpty(request.Address) || !string.IsNullOrEmpty(request.BusinessName))
+            {
+                throw new AuthorizationException("Service", "filter", "Address and BusinessName filters are available only to customers.");
+            }
+        }
+
         if (userContextService.IsCustomer())
         {
             var parameters = new PaginationParameters
             {
                 Offset = request.Offset,
-                Limit = request.Limit
+                Limit = request.Limit,
+                Sort = new SortParameters
+                {
+                    Field = request.OrderBy ?? ServiceSortField.Name,
+                    Direction = request.OrderDirection ?? SortDirection.Ascending
+                }
             };
 
             var filters = new ServiceFilterParameters
@@ -53,9 +59,12 @@ public class ServicesController(IServiceRepository serviceRepository, IUserConte
                 MinPrice = request.MinPrice,
                 MaxPrice = request.MaxPrice,
                 MaxDuration = request.MaxDuration,
+                ServiceName = request.ServiceName,
                 CategoryId = request.CategoryId,
                 CategoryName = request.CategoryName,
-                IsActive = request.IsActive ?? true
+                IsActive = request.IsActive,
+                Address = request.Address,
+                BusinessName = request.BusinessName
             };
 
             var (services, totalCount) = await serviceRepository.GetServicesAsync(parameters, filters);
@@ -70,19 +79,39 @@ public class ServicesController(IServiceRepository serviceRepository, IUserConte
 
             return Ok(response);
         }
+        // provider
         else
         {
+            // providers should not attempt to specify tenantId in query parameters
+            if (request.TenantId.HasValue)
+            {
+                throw new AuthorizationException("Service", "filter", "Providers cannot specify tenantId parameter. Tenant access is automatically enforced from authentication token.");
+            }
+
             var parameters = new PaginationParameters
             {
                 Offset = request.Offset,
-                Limit = request.Limit
+                Limit = request.Limit,
+                Sort = new SortParameters
+                {
+                    Field = request.OrderBy ?? ServiceSortField.Name,
+                    Direction = request.OrderDirection ?? SortDirection.Ascending
+                }
             };
 
             var tenantId = userContextService.GetTenantId();
             var filters = new ServiceFilterParameters
             {
                 TenantId = tenantId,
-                IsActive = request.IsActive ?? true
+                MinPrice = request.MinPrice,
+                MaxPrice = request.MaxPrice,
+                MaxDuration = request.MaxDuration,
+                ServiceName = request.ServiceName,
+                CategoryId = request.CategoryId,
+                CategoryName = request.CategoryName,
+                IsActive = request.IsActive,
+                Address = null, // Providers cannot use tenant-based filters
+                BusinessName = null // Providers cannot use tenant-based filters
             };
 
             var (services, totalCount) = await serviceRepository.GetServicesAsync(parameters, filters);
@@ -100,10 +129,15 @@ public class ServicesController(IServiceRepository serviceRepository, IUserConte
     }
 
     /// <summary>
-    /// Get service by ID.
-    /// Customers: Access any service from any tenant.
-    /// Providers: Access only services from their own tenant.
+    /// Get service by id
     /// </summary>
+    /// <remarks>
+    /// **CUSTOMERS:**
+    /// - Access to services from ALL tenants
+    ///
+    /// **PROVIDERS:**
+    /// - Access ONLY to services from their own tenant
+    /// </remarks>
     [HttpGet("{id:guid}")]
     [Authorize]
     public async Task<ActionResult<object>> GetService(Guid id)
@@ -149,9 +183,11 @@ public class ServicesController(IServiceRepository serviceRepository, IUserConte
     }
 
     /// <summary>
-    /// Update service - Providers only.
-    /// Partial updates supported - only provided fields are modified.
+    /// Update service
     /// </summary>
+    /// <remarks>
+    /// **Providers only**: Updates a service within the provider's tenant.
+    /// </remarks>
     [HttpPatch("{id:guid}")]
     [Authorize]
     public async Task<ActionResult<ServiceResponse>> UpdateService(Guid id, [FromBody] UpdateServiceRequest request)
@@ -188,8 +224,11 @@ public class ServicesController(IServiceRepository serviceRepository, IUserConte
     }
 
     /// <summary>
-    /// Delete service - Providers only.
+    /// Delete service.
     /// </summary>
+    ///  <remarks>
+    /// **Providers only**: Deletes a service within the provider's tenant.
+    /// </remarks>
     [HttpDelete("{id:guid}")]
     [Authorize]
     public async Task<IActionResult> DeleteService(Guid id)

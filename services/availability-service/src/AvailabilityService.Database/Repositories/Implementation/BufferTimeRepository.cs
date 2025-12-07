@@ -41,7 +41,24 @@ public class BufferTimeRepository(AvailabilityDbContext context) : IBufferTimeRe
     {
         return await context.BufferTimes
             .AsNoTracking()
-            .FirstOrDefaultAsync(bt => bt.TenantId == tenantId);
+            .FirstOrDefaultAsync(bt => bt.TenantId == tenantId && bt.CategoryId == null);
+    }
+
+    public async Task<BufferTime?> GetBufferTimeByTenantAndCategoryAsync(Guid tenantId, Guid? categoryId)
+    {
+        return await context.BufferTimes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(bt => bt.TenantId == tenantId && bt.CategoryId == categoryId);
+    }
+
+    public async Task<IEnumerable<BufferTime>> GetBufferTimesByTenantAsync(Guid tenantId)
+    {
+        return await context.BufferTimes
+            .AsNoTracking()
+            .Where(bt => bt.TenantId == tenantId)
+            .OrderBy(bt => bt.CategoryId.HasValue ? 1 : 0) // Global buffer times first
+            .ThenBy(bt => bt.CategoryId)
+            .ToListAsync();
     }
 
     public async Task CreateBufferTimeAsync(BufferTime bufferTime)

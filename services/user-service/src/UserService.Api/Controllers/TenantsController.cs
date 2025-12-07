@@ -12,7 +12,7 @@ namespace UserService.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/tenants")]
-public class TenantsController(ITenantService tenantService) : ControllerBase
+public class TenantsController(ITenantService tenantService) : BaseApiController
 {
     [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -63,28 +63,5 @@ public class TenantsController(ITenantService tenantService) : ControllerBase
 
         var tenant = await tenantService.UpdateTenantAsync(id, userId, request);
         return Ok(tenant);
-    }
-    
-    
-    private Guid GetUserIdFromToken()
-    {
-        var userIdClaim = User.FindFirst("user_id")?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new AuthenticationException("token", "Invalid user token");
-        }
-
-        return userId;
-    }
-
-    private Guid? GetTenantIdFromToken()
-    {
-        var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
-        if (string.IsNullOrEmpty(tenantIdClaim))
-        {
-            return null;
-        }
-
-        return Guid.TryParse(tenantIdClaim, out var tenantId) ? tenantId : null;
     }
 }

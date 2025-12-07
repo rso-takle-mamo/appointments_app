@@ -18,7 +18,6 @@ public class JwtTokenService(IConfiguration configuration) : IJwtTokenService
     {
         var jwtKey = configuration["Jwt:Key"] ?? EnvironmentVariables.GetRequiredVariable("JWT_SECRET_KEY");
         var jwtIssuer = configuration["Jwt:Issuer"] ?? "UserService";
-        var jwtAudience = configuration["Jwt:Audience"] ?? "UserService";
         var expirationHours = int.Parse(configuration["Jwt:ExpirationHours"] ?? "24");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
@@ -41,7 +40,6 @@ public class JwtTokenService(IConfiguration configuration) : IJwtTokenService
 
         var token = new JwtSecurityToken(
             issuer: jwtIssuer,
-            audience: jwtAudience,
             claims: claims,
             expires: expiresAt,
             signingCredentials: credentials

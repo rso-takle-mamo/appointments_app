@@ -57,6 +57,15 @@ public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepo
             .FirstOrDefaultAsync(tb => tb.Id == id);
     }
 
+    public async Task<IEnumerable<TimeBlock>> GetTimeBlocksByTenantAsync(Guid tenantId)
+    {
+        return await context.TimeBlocks
+            .AsNoTracking()
+            .Where(tb => tb.TenantId == tenantId)
+            .OrderBy(tb => tb.StartDateTime)
+            .ToListAsync();
+    }
+
     public async Task CreateTimeBlockAsync(TimeBlock timeBlock)
     {
         timeBlock.Id = Guid.NewGuid();
@@ -84,17 +93,8 @@ public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepo
         if (updateRequest.Reason != null)
             existingTimeBlock.Reason = updateRequest.Reason;
 
-        if (updateRequest.IsRecurring.HasValue)
-            existingTimeBlock.IsRecurring = updateRequest.IsRecurring.Value;
-
-        if (updateRequest.Pattern.HasValue)
-            existingTimeBlock.Pattern = updateRequest.Pattern.Value;
-
-        if (updateRequest.RecurringDays != null)
-            existingTimeBlock.RecurringDays = updateRequest.RecurringDays;
-
-        if (updateRequest.RecurrenceEndDate.HasValue)
-            existingTimeBlock.RecurrenceEndDate = updateRequest.RecurrenceEndDate.Value;
+        if (updateRequest.RecurrencePattern != null)
+            existingTimeBlock.RecurrencePattern = updateRequest.RecurrencePattern;
 
         if (updateRequest.ExternalEventId != null)
             existingTimeBlock.ExternalEventId = updateRequest.ExternalEventId;
@@ -113,5 +113,22 @@ public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepo
         context.TimeBlocks.Remove(timeBlock);
         await context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<int> DeleteTimeBlocksByDateRangeAsync(DateTime start, DateTime end, Guid tenantId)
+    {
+        var timeBlocksToDelete = await context.TimeBlocks
+            .Where(tb => tb.TenantId == tenantId &&
+                        tb.StartDateTime >= start &&
+                        tb.EndDateTime <= end)
+            .ToListAsync();
+
+        if (timeBlocksToDelete.Any())
+        {
+            context.TimeBlocks.RemoveRange(timeBlocksToDelete);
+            await context.SaveChangesAsync();
+        }
+
+        return timeBlocksToDelete.Count;
     }
 }

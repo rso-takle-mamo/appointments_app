@@ -1,4 +1,4 @@
-using System;
+using System.Text.Json.Serialization;
 
 namespace AvailabilityService.Database.Entities;
 
@@ -8,14 +8,6 @@ public enum TimeBlockType
     Break,
     Custom,
     GoogleCalendarEvent
-}
-
-public enum RecurrencePattern
-{
-    None,
-    Daily,
-    Weekly,
-    Monthly
 }
 
 public class TimeBlock
@@ -28,14 +20,17 @@ public class TimeBlock
     public string? Reason { get; set; }
 
     // Recurrence support
-    public bool IsRecurring { get; set; } = false;
-    public RecurrencePattern Pattern { get; set; } = RecurrencePattern.None;
-    public DayOfWeek[]? RecurringDays { get; set; }
-    public DateTime? RecurrenceEndDate { get; set; }
+    public RecurrencePattern? RecurrencePattern { get; set; }
 
     // External sync
     public string? ExternalEventId { get; set; }
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Helper property to check if this time block is recurring
+    /// </summary>
+    [JsonIgnore]
+    public bool IsRecurring => RecurrencePattern != null;
 }

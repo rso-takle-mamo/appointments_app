@@ -1,8 +1,7 @@
-using System.Net;
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AvailabilityService.Api.Models;
+using AvailabilityService.Api.Exceptions;
 
 namespace AvailabilityService.Api.Middleware;
 
@@ -14,67 +13,73 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
         {
             await next(context);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            logger.LogError(ex, "An unhandled exception occurred");
-            await HandleExceptionAsync(context, ex);
+            var errorResponse = CreateErrorResponse(exception);
+            var statusCode = GetStatusCode(exception);
+
+            logger.LogError(
+                "Exception: {ExceptionType}, Message: {ExceptionMessage}, StatusCode: {StatusCode}",
+                exception.GetType().Name,
+                exception.Message,
+                statusCode);
+
+            context.Response.StatusCode = statusCode;
+            context.Response.ContentType = "application/json";
+
+            var responseJson = JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            await context.Response.WriteAsync(responseJson);
         }
     }
 
-    private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private static object CreateErrorResponse(Exception exception)
     {
-        context.Response.Clear();
-        context.Response.ContentType = "application/json";
-
-        var errorResponse = new ErrorResponse();
-
-        switch (exception)
+        return exception switch
         {
-            case InvalidOperationException ex:
-                context.Response.StatusCode = (int)HttpStatusCode.Conflict;
-                errorResponse.Error.Code = "BUSINESS_RULE_VIOLATION";
-                errorResponse.Error.Message = ex.Message;
-                break;
+            // Custom domain exceptions
+            ValidationException ex => ErrorResponses.CreateValidation(
+                $"Validation failed with {ex.ValidationErrors?.Count ?? 0} error(s).",
+                ex.ValidationErrors ?? new List<ValidationError>()
+            ),
+            NotFoundException ex => ErrorResponses.Create(
+                ex.ErrorCode,
+                ex.Message,
+                ex.ResourceType ?? "Resource",
+                ex.ResourceId
+            ),
+            ConflictException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+            AuthenticationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+            AuthorizationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+            DatabaseOperationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
 
-            case ArgumentException ex:
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                errorResponse.Error.Code = "INVALID_ARGUMENT";
-                errorResponse.Error.Message = ex.Message;
-                break;
+            // Database exceptions
+            DbUpdateException ex => ErrorResponses.Create(
+                "DATABASE_ERROR",
+                ex.InnerException?.Message ?? ex.Message
+            ),
 
-            case DbUpdateException ex:
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                errorResponse.Error.Code = "DATABASE_ERROR";
-                errorResponse.Error.Message = "Database operation failed. Please check your input.";
-                break;
-
-            case KeyNotFoundException ex:
-                context.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                errorResponse.Error.Code = "RESOURCE_NOT_FOUND";
-                errorResponse.Error.Message = ex.Message;
-                break;
-
-            case UnauthorizedAccessException ex:
-                context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
-                errorResponse.Error.Code = "UNAUTHORIZED";
-                errorResponse.Error.Message = "Access denied";
-                break;
-
-            default:
-                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                errorResponse.Error.Code = "INTERNAL_SERVER_ERROR";
-                errorResponse.Error.Message = "An unexpected error occurred. Please try again later.";
-                break;
-        }
-
-        errorResponse.Error.TraceId = context.TraceIdentifier;
-
-        var jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            _ => ErrorResponses.Create("INTERNAL_SERVER_ERROR", "An internal server error occurred.")
         };
-
-        var jsonResponse = JsonSerializer.Serialize(errorResponse, jsonOptions);
-        await context.Response.WriteAsync(jsonResponse);
     }
+
+    private static int GetStatusCode(Exception exception) =>
+        exception switch
+        {
+            // Custom domain exceptions
+            ValidationException => StatusCodes.Status400BadRequest,
+            NotFoundException => StatusCodes.Status404NotFound,
+            ConflictException => StatusCodes.Status409Conflict,
+            AuthenticationException => StatusCodes.Status401Unauthorized,
+            AuthorizationException => StatusCodes.Status403Forbidden,
+            DatabaseOperationException => StatusCodes.Status500InternalServerError,
+
+            // Database exceptions
+            DbUpdateException => StatusCodes.Status400BadRequest,
+
+            _ => StatusCodes.Status500InternalServerError
+        };
 }

@@ -23,5 +23,7 @@ namespace ServiceCatalogService.Database.Entities
         public DateTime UpdatedAt { get; set; }
 
         public Category? Category { get; set; }
+
+        public Tenant? Tenant { get; set; }
     }
 }

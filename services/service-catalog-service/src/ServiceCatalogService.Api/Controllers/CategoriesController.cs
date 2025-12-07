@@ -18,74 +18,89 @@ public class CategoriesController(ICategoryRepository categoryRepository, IUserC
     /// Get category of a specific service
     /// </summary>
     /// <remarks>
-    /// **Customers only**: Retrieves the category associated with a specific service.
+    /// **CUSTOMERS:**
+    /// - Can access category of any service from any tenant
+    ///
+    /// **PROVIDERS:**
+    /// - Can only access category of services from their own tenant
     /// </remarks>
     /// <param name="serviceId">The unique identifier of the service</param>
     /// <returns>Category information associated with the service</returns>
     /// <response code="200">Successfully retrieved category information</response>
     /// <response code="401">User not authenticated</response>
-    /// <response code="403">User is not a Customer (Providers not allowed)</response>
+    /// <response code="403">Provider trying to access service from different tenant</response>
     /// <response code="404">Service not found or service has no assigned category</response>
     [HttpGet("/api/services/{serviceId}/category")]
     [Authorize]
     public async Task<ActionResult<CategoryResponse>> GetServiceCategory(Guid serviceId)
     {
-        if (!userContextService.IsCustomer())
-        {
-            throw new AuthorizationException("Category", "read", "Access denied. Only customers can access service category information.");
-        }
-
         var category = await categoryRepository.GetCategoryByServiceIdAsync(serviceId);
-        return category == null ? throw new NotFoundException("Category", $"No category found for service {serviceId}") : Ok(category.ToCategoryResponse());
-    }
-
-    /// <summary>
-    /// Get all categories for a specific tenant
-    /// </summary>
-    /// <remarks>
-    /// **Customers only**: Retrieves all categories belonging to a specific tenant/organization.
-    /// </remarks>
-    /// <param name="tenantId">The unique identifier of the tenant/organization</param>
-    /// <returns>List of all categories belonging to the specified tenant</returns>
-    /// <response code="200">Successfully retrieved categories list</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="403">User is not a Customer (Providers not allowed)</response>
-    [HttpGet("/api/tenants/{tenantId}/categories")]
-    [Authorize]
-    public async Task<ActionResult<IEnumerable<CategoryResponse>>> GetTenantCategories(Guid tenantId)
-    {
-        if (!userContextService.IsCustomer())
+        if (category == null)
         {
-            throw new AuthorizationException("Category", "read", "Access denied. Only customers can access tenant categories.");
+            throw new NotFoundException("Category", $"No category found for service {serviceId}");
         }
 
-        var categories = await categoryRepository.GetCategoriesByTenantIdAsync(tenantId);
-        return Ok(categories.Select(c => c.ToCategoryResponse()));
+        if (!userContextService.IsCustomer())
+        {
+            userContextService.ValidateTenantAccess(category.TenantId, "Service");
+        }
+
+        return Ok(category.ToCategoryResponse());
     }
 
+    
     /// <summary>
-    /// Get all categories belonging to the authenticated provider
+    /// Get categories with filtering
     /// </summary>
     /// <remarks>
-    /// **Providers only**: Retrieves all categories managed by the authenticated provider.
+    /// **CUSTOMERS:**
+    /// - tenantId query parameter is REQUIRED
+    ///
+    /// **PROVIDERS:**
+    /// - Access ONLY categories from their own tenant
+    /// - Cannot specify tenantId parameter (rejected with authorization error)
     /// </remarks>
-    /// <returns>List of categories belonging to the authenticated provider's tenant</returns>
-    /// <response code="200">Successfully retrieved provider's categories</response>
+    /// <param name="tenantId">Tenant ID for customers (required), ignored for providers</param>
+    /// <returns>List of categories based on user role and filters</returns>
+    /// <response code="200">Categories retrieved successfully (may be empty if tenant has no categories)</response>
+    /// <response code="400">Invalid request (missing tenantId for customers, etc.)</response>
     /// <response code="401">User not authenticated</response>
-    /// <response code="403">User is not a Provider (Customers not allowed)</response>
+    /// <response code="403">User not authorized or provider attempted to specify tenantId</response>
     [HttpGet]
     [Authorize]
-    public async Task<ActionResult<IEnumerable<CategoryResponse>>> GetProviderCategories()
+    public async Task<ActionResult<IEnumerable<CategoryResponse>>> GetCategories([FromQuery] Guid? tenantId)
     {
-        userContextService.ValidateProviderAccess();
-        var tenantId = userContextService.GetTenantId();
-        var categories = await categoryRepository.GetCategoriesByTenantIdAsync(tenantId);
-        return Ok(categories.Select(c => c.ToCategoryResponse()));
+        if (userContextService.IsCustomer())
+        {
+            if (!tenantId.HasValue)
+            {
+                return BadRequest("TenantId is required for customers");
+            }
+
+            var categories = await categoryRepository.GetCategoriesByTenantIdAsync(tenantId.Value);
+            return Ok(categories.Select(c => c.ToCategoryResponse()));
+        }
+        // Provider
+        else
+        {
+            if (tenantId.HasValue)
+            {
+                throw new AuthorizationException("Category", "filter", "Providers cannot specify tenantId parameter. Tenant access is automatically enforced from your authentication token.");
+            }
+
+            userContextService.ValidateProviderAccess();
+            var providerTenantId = userContextService.GetTenantId();
+            var categories = await categoryRepository.GetCategoriesByTenantIdAsync(providerTenantId);
+            return Ok(categories.Select(c => c.ToCategoryResponse()));
+        }
     }
 
     /// <summary>
-    /// Get category by ID - Providers only
+    /// Get category by id
     /// </summary>
+    /// <remarks>
+    /// **Providers only**: Deletes a category within the provider's tenant.
+    /// </remarks>
     [HttpGet("{categoryId:guid}")]
     [Authorize]
     public async Task<ActionResult<CategoryResponse>> GetCategory(Guid categoryId)
@@ -136,8 +151,11 @@ public class CategoriesController(ICategoryRepository categoryRepository, IUserC
     }
 
     /// <summary>
-    /// Update category - Providers only (names must remain unique within tenant)
+    /// Update category
     /// </summary>
+    /// <remarks>
+    /// **Providers only**: Updates a category within the provider's tenant.
+    /// </remarks>
     [HttpPatch("{categoryId:guid}")]
     [Authorize]
     public async Task<ActionResult<CategoryResponse>> UpdateCategory(Guid categoryId, [FromBody] UpdateCategoryRequest request)
@@ -178,8 +196,11 @@ public class CategoriesController(ICategoryRepository categoryRepository, IUserC
     }
 
     /// <summary>
-    /// Delete category - Providers only (services will have null CategoryId)
+    /// Delete category
     /// </summary>
+    /// <remarks>
+    /// **Providers only**: Deletes a category within the provider's tenant.
+    /// </remarks>
     [HttpDelete("{categoryId:guid}")]
     [Authorize]
     public async Task<IActionResult> DeleteCategory(Guid categoryId)

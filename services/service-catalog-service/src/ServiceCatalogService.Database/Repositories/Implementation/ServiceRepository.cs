@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ServiceCatalogService.Database.Entities;
+using ServiceCatalogService.Database.Enums;
 using ServiceCatalogService.Database.Models;
 using ServiceCatalogService.Database.Repositories.Interfaces;
 using ServiceCatalogService.Database.UpdateModels;
@@ -12,6 +13,7 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
     {
         var query = context.Services
             .Include(s => s.Category)
+            .Include(s => s.Tenant)
             .AsNoTracking()
             .AsQueryable();
 
@@ -36,6 +38,11 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
             query = query.Where(s => s.DurationMinutes <= filters.MaxDuration.Value);
         }
 
+        if (!string.IsNullOrEmpty(filters.ServiceName))
+        {
+            query = query.Where(s => EF.Functions.ILike(s.Name, $"%{filters.ServiceName}%"));
+        }
+
         if (filters.CategoryId.HasValue)
         {
             query = query.Where(s => s.CategoryId == filters.CategoryId.Value);
@@ -51,10 +58,23 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
             query = query.Where(s => s.IsActive == filters.IsActive.Value);
         }
 
+        // Tenant-based filtering
+        if (!string.IsNullOrEmpty(filters.Address))
+        {
+            query = query.Where(s => s.Tenant != null && EF.Functions.ILike(s.Tenant.Address, $"%{filters.Address}%"));
+        }
+
+        if (!string.IsNullOrEmpty(filters.BusinessName))
+        {
+            query = query.Where(s => s.Tenant != null && EF.Functions.ILike(s.Tenant.BusinessName, $"%{filters.BusinessName}%"));
+        }
+
         var totalCount = await query.CountAsync();
 
+        // Apply dynamic ordering
+        query = ApplySorting(query, parameters.Sort);
+
         var services = await query
-            .OrderBy(s => s.Name)
             .Skip(parameters.Offset)
             .Take(parameters.Limit)
             .ToListAsync();
@@ -66,6 +86,7 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
     {
         return await context.Services
             .Include(s => s.Category)
+            .Include(s => s.Tenant)
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
@@ -136,5 +157,38 @@ public class ServiceRepository(ServiceCatalogDbContext context) : IServiceReposi
         await context.SaveChangesAsync();
 
         return true;
+    }
+
+    private static IQueryable<Service> ApplySorting(IQueryable<Service> query, SortParameters? sortParameters)
+    {
+        var sortField = sortParameters?.Field ?? ServiceSortField.Name;
+        var sortDirection = sortParameters?.Direction ?? SortDirection.Ascending;
+
+        query = sortField switch
+        {
+            ServiceSortField.Name => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(s => s.Name)
+                : query.OrderByDescending(s => s.Name),
+
+            ServiceSortField.Price => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(s => s.Price)
+                : query.OrderByDescending(s => s.Price),
+
+            ServiceSortField.Duration => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(s => s.DurationMinutes)
+                : query.OrderByDescending(s => s.DurationMinutes),
+
+            ServiceSortField.CreatedAt => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(s => s.CreatedAt)
+                : query.OrderByDescending(s => s.CreatedAt),
+
+            ServiceSortField.UpdatedAt => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(s => s.UpdatedAt)
+                : query.OrderByDescending(s => s.UpdatedAt),
+
+            _ => query.OrderBy(s => s.Name) // Default fallback
+        };
+
+        return query;
     }
 }

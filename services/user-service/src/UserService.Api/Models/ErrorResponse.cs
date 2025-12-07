@@ -7,7 +7,7 @@ public class ErrorResponse
 
 public class ValidationErrorResponse : ErrorResponse
 {
-    public required List<ValidationError> ValidationErrors { get; set; }
+    public required Dictionary<string, List<ValidationError>> ValidationErrors { get; set; }
 }
 
 public static class ErrorResponses
@@ -38,7 +38,7 @@ public static class ErrorResponses
         };
     }
 
-    public static ValidationErrorResponse CreateValidation(string message, List<ValidationError> validationErrors)
+    public static ValidationErrorResponse CreateValidation(string message, Dictionary<string, List<ValidationError>> validationErrors)
     {
         return new ValidationErrorResponse
         {

@@ -6,10 +6,12 @@ namespace AvailabilityService.Database.Repositories.Interfaces;
 
 public interface IWorkingHoursRepository
 {
-    Task<(IEnumerable<WorkingHours> WorkingHours, int TotalCount)> GetWorkingHoursAsync(PaginationParameters parameters, Guid? tenantId = null);
-    Task<(IEnumerable<WorkingHours> WorkingHours, int TotalCount)> GetWorkingHoursByServiceAsync(Guid serviceId, PaginationParameters parameters, Guid? tenantId = null);
     Task<WorkingHours?> GetWorkingHoursByIdAsync(Guid id);
+    Task<WorkingHours?> GetWorkingHoursByTenantAndDayAsync(Guid tenantId, DayOfWeek day);
+    Task<IEnumerable<WorkingHours>> GetWorkingHoursByTenantAsync(Guid tenantId);
     Task CreateWorkingHoursAsync(WorkingHours workingHours);
     Task<bool> UpdateWorkingHoursAsync(Guid id, UpdateWorkingHours updateRequest);
     Task<bool> DeleteWorkingHoursAsync(Guid id);
+    Task<bool> DeleteWorkingHoursByTenantAsync(Guid tenantId);
+    Task<int> CreateMultipleWorkingHoursAsync(IEnumerable<WorkingHours> workingHours);
 }

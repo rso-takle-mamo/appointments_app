@@ -33,7 +33,9 @@ public static class MappingExtensions
             CategoryName = service.Category?.Name,
             IsActive = service.IsActive,
             CreatedAt = service.CreatedAt,
-            UpdatedAt = service.UpdatedAt
+            UpdatedAt = service.UpdatedAt,
+            BusinessName = service.Tenant?.BusinessName,
+            Address = service.Tenant?.Address
         };
     }
 

@@ -6,12 +6,14 @@ using Microsoft.IdentityModel.Tokens;
 using HealthChecks.UI.Client;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ServiceCatalogService.Api.Middleware;
 using ServiceCatalogService.Api.Services;
 using ServiceCatalogService.Api.Filters;
 using ServiceCatalogService.Api.Configuration;
 using ServiceCatalogService.Database;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +26,7 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = false;
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 // Configure API behavior to suppress automatic model validation response
@@ -44,6 +47,9 @@ if (builder.Environment.IsDevelopment())
             Title = "ServiceCatalog API",
             Version = "v1"
         });
+
+        // Configure enum handling for Swagger
+        c.SchemaFilter<EnumSchemaFilter>();
 
         // Add JWT Authentication to Swagger
         c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -84,11 +90,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidateAudience = true,
+            ValidateAudience = false,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSettings.Issuer,
-            ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ClockSkew = TimeSpan.Zero
         };
@@ -96,7 +101,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// Add HttpContextAccessor for UserContext service
 builder.Services.AddHttpContextAccessor();
 
 // Database configuration
@@ -130,6 +134,7 @@ builder.Services.AddScoped<ModelValidationFilter>();
 
 // Register application services
 builder.Services.AddScoped<IUserContextService, UserContextService>();
+
 
 var app = builder.Build();
 

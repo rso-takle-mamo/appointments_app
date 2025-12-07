@@ -16,4 +16,9 @@ public class PaginationParameters
         get => _limit;
         set => _limit = (value > MaxPageSize) ? MaxPageSize : value;
     }
+
+    /// <summary>
+    /// Optional sorting parameters. If null, defaults to sorting by Name in ascending order.
+    /// </summary>
+    public SortParameters? Sort { get; set; }
 }

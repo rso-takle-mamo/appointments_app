@@ -23,4 +23,8 @@ public class ServiceResponse
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    public string? BusinessName { get; set; }
+
+    public string? Address { get; set; }
 }

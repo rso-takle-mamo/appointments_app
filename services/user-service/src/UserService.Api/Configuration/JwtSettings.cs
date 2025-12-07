@@ -6,5 +6,4 @@ public class JwtSettings
 
     public string Key { get; set; } = string.Empty;
     public string Issuer { get; set; } = "UserService";
-    public string Audience { get; set; } = "UserService";
 }

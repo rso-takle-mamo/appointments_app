@@ -8,52 +8,6 @@ namespace AvailabilityService.Database.Repositories.Implementation;
 
 public class WorkingHoursRepository(AvailabilityDbContext context) : IWorkingHoursRepository
 {
-    public async Task<(IEnumerable<WorkingHours> WorkingHours, int TotalCount)> GetWorkingHoursAsync(PaginationParameters parameters, Guid? tenantId = null)
-    {
-        var query = context.WorkingHours
-            .AsNoTracking()
-            .AsQueryable();
-
-        if (tenantId.HasValue)
-        {
-            query = query.Where(wh => wh.TenantId == tenantId.Value);
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var workingHours = await query
-            .OrderBy(wh => wh.Day)
-            .ThenBy(wh => wh.StartTime)
-            .Skip(parameters.Offset)
-            .Take(parameters.Limit)
-            .ToListAsync();
-
-        return (workingHours, totalCount);
-    }
-
-    public async Task<(IEnumerable<WorkingHours> WorkingHours, int TotalCount)> GetWorkingHoursByServiceAsync(Guid serviceId, PaginationParameters parameters, Guid? tenantId = null)
-    {
-        var query = context.WorkingHours
-            .AsNoTracking()
-            .Where(wh => wh.ServiceId == serviceId);
-
-        if (tenantId.HasValue)
-        {
-            query = query.Where(wh => wh.TenantId == tenantId.Value);
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var workingHours = await query
-            .OrderBy(wh => wh.Day)
-            .ThenBy(wh => wh.StartTime)
-            .Skip(parameters.Offset)
-            .Take(parameters.Limit)
-            .ToListAsync();
-
-        return (workingHours, totalCount);
-    }
-
     public async Task<WorkingHours?> GetWorkingHoursByIdAsync(Guid id)
     {
         return await context.WorkingHours
@@ -88,9 +42,7 @@ public class WorkingHoursRepository(AvailabilityDbContext context) : IWorkingHou
         if (updateRequest.EndTime.HasValue)
             existingWorkingHours.EndTime = updateRequest.EndTime.Value;
 
-        if (updateRequest.IsActive.HasValue)
-            existingWorkingHours.IsActive = updateRequest.IsActive.Value;
-
+  
         if (updateRequest.MaxConcurrentBookings.HasValue)
             existingWorkingHours.MaxConcurrentBookings = updateRequest.MaxConcurrentBookings.Value;
 
@@ -98,6 +50,23 @@ public class WorkingHoursRepository(AvailabilityDbContext context) : IWorkingHou
 
         await context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<WorkingHours?> GetWorkingHoursByTenantAndDayAsync(Guid tenantId, DayOfWeek day)
+    {
+        return await context.WorkingHours
+            .AsNoTracking()
+            .FirstOrDefaultAsync(wh => wh.TenantId == tenantId && wh.Day == day);
+    }
+
+    public async Task<IEnumerable<WorkingHours>> GetWorkingHoursByTenantAsync(Guid tenantId)
+    {
+        return await context.WorkingHours
+            .AsNoTracking()
+            .Where(wh => wh.TenantId == tenantId)
+            .OrderBy(wh => wh.Day)
+            .ThenBy(wh => wh.StartTime)
+            .ToListAsync();
     }
 
     public async Task<bool> DeleteWorkingHoursAsync(Guid id)
@@ -108,5 +77,36 @@ public class WorkingHoursRepository(AvailabilityDbContext context) : IWorkingHou
         context.WorkingHours.Remove(workingHours);
         await context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<bool> DeleteWorkingHoursByTenantAsync(Guid tenantId)
+    {
+        var workingHoursToDelete = await context.WorkingHours
+            .Where(wh => wh.TenantId == tenantId)
+            .ToListAsync();
+
+        if (workingHoursToDelete.Any())
+        {
+            context.WorkingHours.RemoveRange(workingHoursToDelete);
+            await context.SaveChangesAsync();
+        }
+
+        return true;
+    }
+
+    public async Task<int> CreateMultipleWorkingHoursAsync(IEnumerable<WorkingHours> workingHours)
+    {
+        var workingHoursList = workingHours.ToList();
+
+        foreach (var wh in workingHoursList)
+        {
+            wh.CreatedAt = DateTime.UtcNow;
+            wh.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await context.WorkingHours.AddRangeAsync(workingHoursList);
+        await context.SaveChangesAsync();
+
+        return workingHoursList.Count;
     }
 }

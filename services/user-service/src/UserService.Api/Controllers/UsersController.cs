@@ -13,7 +13,7 @@ namespace UserService.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/users")]
-public class UsersController(IUserService userService) : ControllerBase
+public class UsersController(IUserService userService) : BaseApiController
 {
     [HttpGet("me")]
     [Produces("application/json")]
@@ -53,16 +53,5 @@ public class UsersController(IUserService userService) : ControllerBase
         var userId = GetUserIdFromToken();
         await userService.DeleteUserAsync(userId);
         return NoContent();
-    }
-
-    private Guid GetUserIdFromToken()
-    {
-        var userIdClaim = User.FindFirst("user_id")?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new AuthenticationException("token", "Invalid user token");
-        }
-
-        return userId;
     }
 }

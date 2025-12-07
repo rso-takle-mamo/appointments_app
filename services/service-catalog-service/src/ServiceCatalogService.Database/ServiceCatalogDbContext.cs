@@ -1,75 +1,61 @@
 using Microsoft.EntityFrameworkCore;
+using ServiceCatalogService.Database.Configurations;
 using ServiceCatalogService.Database.Entities;
 
 namespace ServiceCatalogService.Database;
 
-public class ServiceCatalogDbContext() : DbContext()
+public class ServiceCatalogDbContext : DbContext
 {
+    public ServiceCatalogDbContext() { }
+
+    public ServiceCatalogDbContext(DbContextOptions<ServiceCatalogDbContext> options) : base(options) { }
+
+    public DbSet<Tenant> Tenants { get; set; }
     public DbSet<Category> Categories { get; set; }
     public DbSet<Service> Services { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.UseNpgsql(EnvironmentVariables.GetRequiredVariable("DATABASE_CONNECTION_STRING"));
-        base.OnConfiguring(optionsBuilder);
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         
-        modelBuilder.Entity<Category>(entity =>
+        modelBuilder.ApplyConfiguration(new CategoryConfiguration());
+        modelBuilder.ApplyConfiguration(new ServiceConfiguration());
+        
+        // Data replication from users service
+        // TODO add kafka to synchronize it
+        modelBuilder.ApplyConfiguration(new TenantConfiguration());
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        // Automatically set CreatedAt and UpdatedAt timestamps
+        var entries = ChangeTracker
+            .Entries()
+            .Where(e => e.Entity is Tenant || e.Entity is Category || e.Entity is Service &&
+                (e.State == EntityState.Added || e.State == EntityState.Modified));
+
+        foreach (var entityEntry in entries)
         {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).
-                IsRequired().
-                HasMaxLength(100);
-            entity.Property(e => e.Description).
-                HasMaxLength(500);
-            entity.Property(e => e.TenantId)
-                .IsRequired();
+            if (entityEntry.State == EntityState.Added)
+            {
+                if (entityEntry.Entity is Tenant tenant)
+                    tenant.CreatedAt = DateTime.UtcNow;
+                else if (entityEntry.Entity is Category category)
+                    category.CreatedAt = DateTime.UtcNow;
+                else if (entityEntry.Entity is Service service)
+                    service.CreatedAt = DateTime.UtcNow;
+            }
+            else if (entityEntry.State == EntityState.Modified)
+            {
+                if (entityEntry.Entity is Tenant tenant)
+                    tenant.UpdatedAt = DateTime.UtcNow;
+                else if (entityEntry.Entity is Category category)
+                    category.UpdatedAt = DateTime.UtcNow;
+                else if (entityEntry.Entity is Service service)
+                    service.UpdatedAt = DateTime.UtcNow;
+            }
+        }
 
-            entity.HasIndex(e => new { e.TenantId, e.Name }).IsUnique();
-            entity.HasIndex(e => e.TenantId);
-        });
-
-        modelBuilder.Entity<Service>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).
-                IsRequired().
-                HasMaxLength(255);
-            entity.Property(e => e.Description).
-                HasMaxLength(1000);
-            entity.Property(e => e.TenantId)
-                .IsRequired();
-            entity.Property(e => e.Price)
-                .HasPrecision(10, 2);
-            entity.Property(e => e.DurationMinutes)
-                .HasDefaultValue(30);
-            entity.Property(e => e.IsActive)
-                .HasDefaultValue(true);
-            
-            entity.HasOne(s => s.Category)
-                .WithMany()
-                .HasForeignKey(s => s.CategoryId)
-                .OnDelete(DeleteBehavior.SetNull);
-            
-
-            entity.ToTable(table => table.HasCheckConstraint(
-                "CK_Service_Positive_Price",
-                "\"Price\" >= 0"
-            ));
-            
-            entity.ToTable(table => table.HasCheckConstraint(
-                "CK_Service_Positive_Duration",
-                "\"DurationMinutes\" > 0"
-            ));
-
-            entity.ToTable(table => table.HasCheckConstraint(
-                "CK_Service_Reasonable_Duration",
-                "\"DurationMinutes\" <= 480"
-            ));
-        });
+        return await base.SaveChangesAsync(cancellationToken);
     }
 }

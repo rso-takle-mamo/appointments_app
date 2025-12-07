@@ -75,11 +75,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidateAudience = true,
+            ValidateAudience = false,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtSettings.Issuer,
-            ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ClockSkew = TimeSpan.Zero
         };
@@ -87,7 +86,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddUserDatabase();
+builder.Services.AddUserDatabase(builder.Configuration);
 
 builder.Services.AddHealthChecks()
     .AddCheck("self", () =>
@@ -107,6 +106,9 @@ builder.Services.AddHealthChecks()
         name: "postgresql",
         failureStatus: HealthStatus.Unhealthy,
         tags: ["db", "postgresql"]);
+
+// Register middleware
+builder.Services.AddTransient<GlobalExceptionHandler>();
 
 // Register filters
 builder.Services.AddScoped<ModelValidationFilter>();

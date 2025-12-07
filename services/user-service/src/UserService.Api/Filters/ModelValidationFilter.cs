@@ -12,18 +12,39 @@ public class ModelValidationFilter : ActionFilterAttribute
     {
         if (!context.ModelState.IsValid)
         {
-            var validationErrors = context.ModelState
+            // Group validation errors by field
+            var groupedValidationErrors = context.ModelState
                 .Where(x => x.Value?.Errors.Count > 0)
-                .SelectMany(x => x.Value!.Errors.Select(error => new ValidationError
-                {
-                    Field = x.Key == "" ? "Request body" : x.Key,
-                    Message = error.ErrorMessage
-                }))
-                .ToList();
+                .ToDictionary(
+                    // Key: Normalize field name to camelCase
+                    x => GetNormalizedFieldName(x.Key),
+                    // Value: List of validation errors for that field
+                    x => x.Value!.Errors.Select(error => new ValidationError
+                    {
+                        Field = GetNormalizedFieldName(x.Key),
+                        Message = error.ErrorMessage
+                    }).ToList()
+                );
 
-            throw new ValidationException(validationErrors);
+            throw new ValidationException($"Validation failed with {groupedValidationErrors.Count} field(s).", groupedValidationErrors);
         }
 
         base.OnActionExecuting(context);
+    }
+
+    private static string GetNormalizedFieldName(string fieldName)
+    {
+        // Handle empty field name (request body errors)
+        if (string.IsNullOrEmpty(fieldName))
+            return "requestBody";
+
+        // Convert PascalCase to camelCase (e.g., "Username" to "username")
+        if (char.IsUpper(fieldName[0]))
+        {
+            return char.ToLowerInvariant(fieldName[0]) + fieldName[1..];
+        }
+
+        // Return as-is if already lowercase or mixed case
+        return fieldName.ToLowerInvariant();
     }
 }
