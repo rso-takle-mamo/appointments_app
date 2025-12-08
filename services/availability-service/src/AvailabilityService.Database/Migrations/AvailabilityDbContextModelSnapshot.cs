@@ -22,178 +22,124 @@ namespace AvailabilityService.Database.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("AvailabilityService.Database.Entities.BufferTime", b =>
+            modelBuilder.Entity("AvailabilityService.Database.Entities.Booking", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<int>("AfterMinutes")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("BeforeMinutes")
+                    b.Property<int>("BookingStatus")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EndDateTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("StartDateTime")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId")
-                        .IsUnique();
+                    b.HasIndex("BookingStatus");
 
-                    b.ToTable("BufferTimes");
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "CustomerId");
+
+                    b.HasIndex("TenantId", "StartDateTime", "EndDateTime");
+
+                    b.ToTable("Bookings", (string)null);
                 });
 
-            modelBuilder.Entity("AvailabilityService.Database.Entities.GoogleCalendarIntegration", b =>
+            modelBuilder.Entity("AvailabilityService.Database.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("AccessToken")
-                        .HasColumnType("text");
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
-                    b.Property<bool>("AutoSyncEnabled")
-                        .HasColumnType("boolean");
-
-                    b.PrimitiveCollection<string[]>("CalendarIdsToSync")
-                        .HasColumnType("text[]");
-
-                    b.Property<DateTime?>("ConnectedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("ConsecutiveFailures")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DisconnectedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DisconnectionReason")
-                        .HasColumnType("text");
-
-                    b.Property<string>("GoogleCalendarId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("GoogleUserEmail")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastSyncAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastSyncError")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("LastSyncStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SyncIntervalMinutes")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("TokenExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("WebhookChannelId")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("WebhookEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("WebhookExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("WebhookLastReceivedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("WebhookResourceId")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId")
-                        .IsUnique();
-
-                    b.ToTable("GoogleCalendarIntegrations");
-                });
-
-            modelBuilder.Entity("AvailabilityService.Database.Entities.TenantSettings", b =>
-                {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("BufferAfterMinutes")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("BufferBeforeMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("Email")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("TimeZone")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId")
-                        .IsUnique();
-
-                    b.ToTable("TenantSettings");
+                    b.ToTable("Tenants", (string)null);
                 });
 
             modelBuilder.Entity("AvailabilityService.Database.Entities.TimeBlock", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<DateTime>("EndDateTime")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("ExternalEventId")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsRecurring")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("Pattern")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Reason")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("RecurrenceEndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.PrimitiveCollection<int[]>("RecurringDays")
-                        .HasColumnType("integer[]");
+                    b.Property<Guid?>("RecurrenceId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("StartDateTime")
                         .HasColumnType("timestamp with time zone");
@@ -205,11 +151,13 @@ namespace AvailabilityService.Database.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExternalEventId");
+                    b.HasIndex("RecurrenceId");
 
                     b.HasIndex("TenantId");
 
@@ -217,17 +165,20 @@ namespace AvailabilityService.Database.Migrations
 
                     b.HasIndex("TenantId", "StartDateTime");
 
-                    b.ToTable("TimeBlocks");
+                    b.ToTable("TimeBlocks", (string)null);
                 });
 
             modelBuilder.Entity("AvailabilityService.Database.Entities.WorkingHours", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<int>("Day")
                         .HasColumnType("integer");
@@ -235,14 +186,8 @@ namespace AvailabilityService.Database.Migrations
                     b.Property<TimeOnly>("EndTime")
                         .HasColumnType("time without time zone");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("MaxConcurrentBookings")
                         .HasColumnType("integer");
-
-                    b.Property<Guid?>("ServiceId")
-                        .HasColumnType("uuid");
 
                     b.Property<TimeOnly>("StartTime")
                         .HasColumnType("time without time zone");
@@ -251,18 +196,45 @@ namespace AvailabilityService.Database.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ServiceId");
 
                     b.HasIndex("TenantId");
 
                     b.HasIndex("TenantId", "Day")
                         .IsUnique();
 
-                    b.ToTable("WorkingHours");
+                    b.ToTable("WorkingHours", (string)null);
+                });
+
+            modelBuilder.Entity("AvailabilityService.Database.Entities.Booking", b =>
+                {
+                    b.HasOne("AvailabilityService.Database.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AvailabilityService.Database.Entities.TimeBlock", b =>
+                {
+                    b.HasOne("AvailabilityService.Database.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("AvailabilityService.Database.Entities.WorkingHours", b =>
+                {
+                    b.HasOne("AvailabilityService.Database.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

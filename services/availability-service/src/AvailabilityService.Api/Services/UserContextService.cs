@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using AvailabilityService.Api.Exceptions;
+using AvailabilityService.Api.Services.Interfaces;
 
 namespace AvailabilityService.Api.Services;
 

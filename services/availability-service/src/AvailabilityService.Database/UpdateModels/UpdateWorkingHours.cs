@@ -2,7 +2,6 @@ namespace AvailabilityService.Database.UpdateModels;
 
 public class UpdateWorkingHours
 {
-    public Guid? ServiceId { get; set; }
     public DayOfWeek? Day { get; set; }
     public TimeOnly? StartTime { get; set; }
     public TimeOnly? EndTime { get; set; }

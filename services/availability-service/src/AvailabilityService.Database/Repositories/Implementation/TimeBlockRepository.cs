@@ -66,11 +66,20 @@ public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepo
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<TimeBlock>> GetTimeBlocksByTenantAndDateRangeAsync(Guid tenantId, DateTime startDate, DateTime endDate)
+    {
+        return await context.TimeBlocks
+            .AsNoTracking()
+            .Where(tb => tb.TenantId == tenantId &&
+                        tb.StartDateTime < endDate &&
+                        tb.EndDateTime > startDate)
+            .OrderBy(tb => tb.StartDateTime)
+            .ToListAsync();
+    }
+
     public async Task CreateTimeBlockAsync(TimeBlock timeBlock)
     {
         timeBlock.Id = Guid.NewGuid();
-        timeBlock.CreatedAt = DateTime.UtcNow;
-        timeBlock.UpdatedAt = DateTime.UtcNow;
 
         await context.TimeBlocks.AddAsync(timeBlock);
         await context.SaveChangesAsync();
@@ -93,11 +102,6 @@ public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepo
         if (updateRequest.Reason != null)
             existingTimeBlock.Reason = updateRequest.Reason;
 
-        if (updateRequest.RecurrencePattern != null)
-            existingTimeBlock.RecurrencePattern = updateRequest.RecurrencePattern;
-
-        if (updateRequest.ExternalEventId != null)
-            existingTimeBlock.ExternalEventId = updateRequest.ExternalEventId;
 
         existingTimeBlock.UpdatedAt = DateTime.UtcNow;
 
@@ -109,6 +113,21 @@ public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepo
     {
         var timeBlock = await context.TimeBlocks.FindAsync(id);
         if (timeBlock == null) return false;
+
+        context.TimeBlocks.Remove(timeBlock);
+        await context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteTimeBlockAsync(Guid id, Guid tenantId)
+    {
+        var timeBlock = await context.TimeBlocks
+            .FirstOrDefaultAsync(tb => tb.Id == id && tb.TenantId == tenantId);
+
+        if (timeBlock == null)
+        {
+            return false;
+        }
 
         context.TimeBlocks.Remove(timeBlock);
         await context.SaveChangesAsync();
@@ -130,5 +149,38 @@ public class TimeBlockRepository(AvailabilityDbContext context) : ITimeBlockRepo
         }
 
         return timeBlocksToDelete.Count;
+    }
+
+    public async Task<IEnumerable<TimeBlock>> GetTimeBlocksByRecurrenceIdAsync(Guid recurrenceId, Guid tenantId)
+    {
+        return await context.TimeBlocks
+            .AsNoTracking()
+            .Where(tb => tb.RecurrenceId == recurrenceId && tb.TenantId == tenantId)
+            .OrderBy(tb => tb.StartDateTime)
+            .ToListAsync();
+    }
+
+    public async Task CreateMultipleTimeBlocksAsync(IEnumerable<TimeBlock> timeBlocks)
+    {
+        var blocks = timeBlocks.ToList();
+
+        await context.TimeBlocks.AddRangeAsync(blocks);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task DeleteMultipleTimeBlocksAsync(IEnumerable<Guid> ids)
+    {
+        var idsList = ids.ToList();
+        if (!idsList.Any()) return;
+
+        var timeBlocksToDelete = await context.TimeBlocks
+            .Where(tb => idsList.Contains(tb.Id))
+            .ToListAsync();
+
+        if (timeBlocksToDelete.Any())
+        {
+            context.TimeBlocks.RemoveRange(timeBlocksToDelete);
+            await context.SaveChangesAsync();
+        }
     }
 }

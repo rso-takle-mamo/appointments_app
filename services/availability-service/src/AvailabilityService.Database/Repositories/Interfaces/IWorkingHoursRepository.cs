@@ -9,9 +9,11 @@ public interface IWorkingHoursRepository
     Task<WorkingHours?> GetWorkingHoursByIdAsync(Guid id);
     Task<WorkingHours?> GetWorkingHoursByTenantAndDayAsync(Guid tenantId, DayOfWeek day);
     Task<IEnumerable<WorkingHours>> GetWorkingHoursByTenantAsync(Guid tenantId);
+    Task<IEnumerable<WorkingHours>> GetWorkingHoursByTenantAndDateRangeAsync(Guid tenantId, DateTime startDate, DateTime endDate);
     Task CreateWorkingHoursAsync(WorkingHours workingHours);
     Task<bool> UpdateWorkingHoursAsync(Guid id, UpdateWorkingHours updateRequest);
     Task<bool> DeleteWorkingHoursAsync(Guid id);
+    Task<bool> DeleteWorkingHoursAsync(Guid id, Guid tenantId);
     Task<bool> DeleteWorkingHoursByTenantAsync(Guid tenantId);
     Task<int> CreateMultipleWorkingHoursAsync(IEnumerable<WorkingHours> workingHours);
 }

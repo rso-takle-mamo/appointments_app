@@ -21,8 +21,6 @@
       <Folder Include="Controllers\" />
       <Folder Include="Extensions\" />
       <Folder Include="Middleware\" />
-      <Folder Include="Requests\" />
-      <Folder Include="Responses\" />
     </ItemGroup>
 
     <ItemGroup>

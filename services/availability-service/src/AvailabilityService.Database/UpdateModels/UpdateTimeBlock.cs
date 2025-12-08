@@ -8,6 +8,4 @@ public class UpdateTimeBlock
     public DateTime? EndDateTime { get; set; }
     public TimeBlockType? Type { get; set; }
     public string? Reason { get; set; }
-    public Entities.RecurrencePattern? RecurrencePattern { get; set; }
-    public string? ExternalEventId { get; set; }
 }

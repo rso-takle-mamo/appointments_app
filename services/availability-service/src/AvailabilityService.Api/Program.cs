@@ -8,6 +8,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using AvailabilityService.Api.Middleware;
+using AvailabilityService.Api.Services.Interfaces;
 using AvailabilityService.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -59,6 +60,8 @@ if (builder.Environment.IsDevelopment())
         c.OperationFilter<AuthorizeOperationFilter>();
     });
 }
+
+builder.Configuration.AddEnvironmentVariables();
 
 // Configure JWT settings
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
@@ -117,6 +120,12 @@ builder.Services.AddAuthorization(options =>
 // Database configuration
 builder.Services.AddAvailabilityDatabase();
 
+// Register repositories
+builder.Services.AddScoped<AvailabilityService.Database.Repositories.Interfaces.ITenantRepository, AvailabilityService.Database.Repositories.Implementation.TenantRepository>();
+builder.Services.AddScoped<AvailabilityService.Database.Repositories.Interfaces.IBookingRepository, AvailabilityService.Database.Repositories.Implementation.BookingRepository>();
+builder.Services.AddScoped<AvailabilityService.Database.Repositories.Interfaces.ITimeBlockRepository, AvailabilityService.Database.Repositories.Implementation.TimeBlockRepository>();
+builder.Services.AddScoped<AvailabilityService.Database.Repositories.Interfaces.IWorkingHoursRepository, AvailabilityService.Database.Repositories.Implementation.WorkingHoursRepository>();
+
 // Health checks configuration
 builder.Services.AddHealthChecks()
     .AddCheck("self", () =>
@@ -137,6 +146,8 @@ builder.Services.AddHealthChecks()
         failureStatus: HealthStatus.Unhealthy,
         tags: ["db", "postgresql"]);
 
+// Register middleware
+builder.Services.AddTransient<GlobalExceptionHandler>();
 
 // Register filters
 builder.Services.AddScoped<ModelValidationFilter>();
@@ -145,8 +156,10 @@ builder.Services.AddScoped<ModelValidationFilter>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 
-// TODO
-// register services and their interfaces
+// Register application services
+builder.Services.AddScoped<AvailabilityService.Api.Services.Interfaces.IAvailabilityService, AvailabilityService.Api.Services.AvailabilityService>();
+builder.Services.AddScoped<AvailabilityService.Api.Services.Interfaces.ITenantSettingsService, AvailabilityService.Api.Services.TenantSettingsService>();
+builder.Services.AddScoped<AvailabilityService.Api.Services.Interfaces.IRecurrenceService, AvailabilityService.Api.Services.RecurrenceService>();
 
 var app = builder.Build();
 
@@ -175,6 +188,9 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<GlobalExceptionHandler>();
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

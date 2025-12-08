@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using AvailabilityService.Database.Entities;
+using AvailabilityService.Database.Configurations;
 
 namespace AvailabilityService.Database;
 
@@ -7,9 +8,8 @@ public class AvailabilityDbContext : DbContext
 {
     public DbSet<WorkingHours> WorkingHours { get; set; }
     public DbSet<TimeBlock> TimeBlocks { get; set; }
-    public DbSet<GoogleCalendarIntegration> GoogleCalendarIntegrations { get; set; }
-    public DbSet<BufferTime> BufferTimes { get; set; }
-    public DbSet<TenantSettings> TenantSettings { get; set; }
+    public DbSet<Tenant> Tenants { get; set; }
+    public DbSet<Booking> Bookings { get; set; } // NOTE: Booking service not implemented yet - blueprint
 
     public AvailabilityDbContext() { }
 
@@ -17,119 +17,42 @@ public class AvailabilityDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        if (!optionsBuilder.IsConfigured)
-        {
-            optionsBuilder.UseNpgsql(EnvironmentVariables.GetRequiredVariable("DATABASE_CONNECTION_STRING"));
-        }
+        if (optionsBuilder.IsConfigured) return;
+    
+        optionsBuilder.UseNpgsql(EnvironmentVariables.GetRequiredVariable("DATABASE_CONNECTION_STRING"));
     }
-
+    
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // WorkingHours configuration
-        modelBuilder.Entity<WorkingHours>(entity =>
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.ApplyConfiguration(new WorkingHoursConfiguration());
+        modelBuilder.ApplyConfiguration(new TimeBlockConfiguration());
+        modelBuilder.ApplyConfiguration(new TenantConfiguration());
+        modelBuilder.ApplyConfiguration(new BookingConfiguration());
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = ChangeTracker
+            .Entries()
+            .Where(e => e.Entity is WorkingHours || e.Entity is TimeBlock || e.Entity is Tenant || e.Entity is Booking 
+                && (e.State is EntityState.Added or EntityState.Modified));
+
+        foreach (var entityEntry in entries)
         {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.TenantId).IsRequired();
-            entity.Property(e => e.ServiceId);
-            entity.Property(e => e.Day).IsRequired();
-            entity.Property(e => e.StartTime).IsRequired();
-            entity.Property(e => e.EndTime).IsRequired();
-            entity.Property(e => e.MaxConcurrentBookings).IsRequired();
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt).IsRequired();
+            switch (entityEntry.State)
+            {
+                case EntityState.Added:
+                    if (((dynamic)entityEntry.Entity).CreatedAt == default(DateTime))
+                        ((dynamic)entityEntry.Entity).CreatedAt = DateTime.UtcNow;
+                    break;
+                case EntityState.Modified:
+                    ((dynamic)entityEntry.Entity).UpdatedAt = DateTime.UtcNow;
+                    break;
+            }
+        }
 
-            entity.HasIndex(e => new { e.TenantId, e.Day }).IsUnique();
-            entity.HasIndex(e => e.TenantId);
-            entity.HasIndex(e => e.ServiceId);
-        });
-
-        // TimeBlock configuration
-        modelBuilder.Entity<TimeBlock>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.TenantId).IsRequired();
-            entity.Property(e => e.StartDateTime).IsRequired();
-            entity.Property(e => e.EndDateTime).IsRequired();
-            entity.Property(e => e.Type).IsRequired();
-            entity.Property(e => e.Reason);
-            entity.Property(e => e.ExternalEventId);
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt).IsRequired();
-
-            // Configure RecurrencePattern as JSON column
-            entity.Property(e => e.RecurrencePattern)
-                .HasColumnType("jsonb")
-                .HasConversion(
-                    v => v == null ? null : System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
-                    v => string.IsNullOrEmpty(v) ? null : System.Text.Json.JsonSerializer.Deserialize<RecurrencePattern>(v, (System.Text.Json.JsonSerializerOptions?)null));
-
-            entity.HasIndex(e => new { e.TenantId, e.StartDateTime });
-            entity.HasIndex(e => new { e.TenantId, e.EndDateTime });
-            entity.HasIndex(e => e.TenantId);
-            entity.HasIndex(e => e.ExternalEventId);
-        });
-
-        // GoogleCalendarIntegration configuration
-        modelBuilder.Entity<GoogleCalendarIntegration>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.TenantId).IsRequired();
-            entity.Property(e => e.Status).IsRequired();
-            entity.Property(e => e.ConnectedAt);
-            entity.Property(e => e.DisconnectedAt);
-            entity.Property(e => e.DisconnectionReason);
-            entity.Property(e => e.GoogleCalendarId);
-            entity.Property(e => e.CalendarIdsToSync);
-            entity.Property(e => e.GoogleUserEmail);
-            entity.Property(e => e.RefreshToken);
-            entity.Property(e => e.AccessToken);
-            entity.Property(e => e.TokenExpiresAt);
-            entity.Property(e => e.AutoSyncEnabled).IsRequired();
-            entity.Property(e => e.SyncIntervalMinutes).IsRequired();
-            entity.Property(e => e.LastSyncAt);
-            entity.Property(e => e.LastSyncStatus);
-            entity.Property(e => e.LastSyncError);
-            entity.Property(e => e.ConsecutiveFailures).IsRequired();
-            entity.Property(e => e.WebhookEnabled).IsRequired();
-            entity.Property(e => e.WebhookChannelId);
-            entity.Property(e => e.WebhookResourceId);
-            entity.Property(e => e.WebhookExpiresAt);
-            entity.Property(e => e.WebhookLastReceivedAt);
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt).IsRequired();
-
-            entity.HasIndex(e => e.TenantId).IsUnique();
-        });
-
-        // BufferTime configuration
-        modelBuilder.Entity<BufferTime>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.TenantId).IsRequired();
-            entity.Property(e => e.CategoryId);
-            entity.Property(e => e.BeforeMinutes).IsRequired();
-            entity.Property(e => e.AfterMinutes).IsRequired();
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt).IsRequired();
-
-            // Unique constraint on (TenantId, CategoryId) where CategoryId can be null for global buffer times
-            entity.HasIndex(e => new { e.TenantId, e.CategoryId }).IsUnique();
-
-            // CategoryId is a reference to ServiceCatalog.Categories
-            // Note: Since Categories are in a different service, we don't create a real FK constraint
-            // We'll validate CategoryId existence at the application level
-        });
-
-        // TenantSettings configuration
-        modelBuilder.Entity<TenantSettings>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.TenantId).IsRequired();
-            entity.Property(e => e.TimeZone).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt).IsRequired();
-
-            entity.HasIndex(e => e.TenantId).IsUnique();
-        });
+        return await base.SaveChangesAsync(cancellationToken);
     }
 }

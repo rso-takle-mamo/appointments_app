@@ -30,9 +30,6 @@ public class WorkingHoursRepository(AvailabilityDbContext context) : IWorkingHou
         var existingWorkingHours = await context.WorkingHours.FindAsync(id);
         if (existingWorkingHours == null) return false;
 
-        if (updateRequest.ServiceId.HasValue)
-            existingWorkingHours.ServiceId = updateRequest.ServiceId.Value;
-
         if (updateRequest.Day.HasValue)
             existingWorkingHours.Day = updateRequest.Day.Value;
 
@@ -69,10 +66,30 @@ public class WorkingHoursRepository(AvailabilityDbContext context) : IWorkingHou
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<WorkingHours>> GetWorkingHoursByTenantAndDateRangeAsync(Guid tenantId, DateTime startDate, DateTime endDate)
+    {
+        return await GetWorkingHoursByTenantAsync(tenantId);
+    }
+
     public async Task<bool> DeleteWorkingHoursAsync(Guid id)
     {
         var workingHours = await context.WorkingHours.FindAsync(id);
         if (workingHours == null) return false;
+
+        context.WorkingHours.Remove(workingHours);
+        await context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteWorkingHoursAsync(Guid id, Guid tenantId)
+    {
+        var workingHours = await context.WorkingHours
+            .FirstOrDefaultAsync(wh => wh.Id == id && wh.TenantId == tenantId);
+
+        if (workingHours == null)
+        {
+            return false;
+        }
 
         context.WorkingHours.Remove(workingHours);
         await context.SaveChangesAsync();

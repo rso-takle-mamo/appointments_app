@@ -1,73 +1,60 @@
 using Microsoft.AspNetCore.Mvc;
-using AvailabilityService.Api.Models.Requests.TimeBlock;
-using AvailabilityService.Api.Models.Responses;
-using AvailabilityService.Api.Services;
+using AvailabilityService.Api.Requests.TimeBlock;
+using AvailabilityService.Api.Responses;
+using AvailabilityService.Api.Services.Interfaces;
+using AvailabilityService.Api.Exceptions;
+using AvailabilityService.Api.Models;
 using AvailabilityService.Database.Entities;
 using AvailabilityService.Database.Repositories.Interfaces;
+using AvailabilityService.Database.Models;
+using ValidationException = AvailabilityService.Api.Exceptions.ValidationException;
 
 namespace AvailabilityService.Api.Controllers;
 
-[ApiController]
 [Route("api/availability")]
 public class TimeBlockController(
     ILogger<TimeBlockController> logger,
     ITimeBlockRepository timeBlockRepository,
+    IRecurrenceService recurrenceService,
     IUserContextService userContextService)
-    : ControllerBase
+    : BaseApiController
 {
-    /// <summary>
-    /// Get all time blocks
-    /// </summary>
-    /// <param name="tenantId">Optional tenant ID to filter by. If not provided, returns time blocks for current user's tenant.</param>
-    /// <param name="startDate">Optional start date filter (ISO 8601 format)</param>
-    /// <param name="endDate">Optional end date filter (ISO 8601 format)</param>
-    /// <returns>A successful response with time blocks data</returns>
     [HttpGet("time-blocks")]
-    public async Task<IActionResult> GetTimeBlocks([FromQuery] Guid? tenantId = null, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
+    public async Task<IActionResult> GetTimeBlocks([FromQuery] PaginationParameters pagination, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
     {
-        try
+        // Only providers can access time blocks
+        userContextService.ValidateProviderAccess();
+
+        // Get tenant ID from JWT token
+        var targetTenantId = userContextService.GetTenantId();
+
+        logger.LogInformation("Getting time blocks for tenant: {TenantId}, startDate: {StartDate}, endDate: {EndDate}, offset: {Offset}, limit: {Limit}",
+            targetTenantId, startDate, endDate, pagination.Offset, pagination.Limit);
+
+        IEnumerable<TimeBlock> timeBlocks;
+        int totalCount;
+
+        if (startDate.HasValue && endDate.HasValue)
         {
-            Guid targetTenantId;
-            var userRole = userContextService.GetRole();
+            // Get time blocks within date range
+            var (blocks, count) = await timeBlockRepository.GetTimeBlocksByDateRangeAsync(startDate.Value, endDate.Value, targetTenantId);
+            timeBlocks = blocks;
+            totalCount = count;
+        }
+        else
+        {
+            // Get all time blocks for tenant with pagination
+            var (blocks, count) = await timeBlockRepository.GetTimeBlocksAsync(pagination, targetTenantId);
+            timeBlocks = blocks;
+            totalCount = count;
+        }
 
-            if (userContextService.IsCustomer())
-            {
-                // Customer must provide tenantId in query
-                if (!tenantId.HasValue)
-                {
-                    return BadRequest(new { Message = "tenantId query parameter is required for customers" });
-                }
-                targetTenantId = tenantId.Value;
-                userContextService.ValidateTenantAccess(targetTenantId, "TimeBlocks");
-            }
-            else // Provider
-            {
-                // Provider should NOT provide tenantId in query, use their own
-                if (tenantId.HasValue)
-                {
-                    return BadRequest(new { Message = "Providers should not provide tenantId parameter. They can only access their own time blocks." });
-                }
-                targetTenantId = userContextService.GetTenantId();
-            }
-
-            logger.LogInformation("Getting time blocks for tenant: {TenantId}, startDate: {StartDate}, endDate: {EndDate}, role: {Role}",
-                targetTenantId, startDate, endDate, userRole);
-
-            IEnumerable<TimeBlock> timeBlocks;
-
-            if (startDate.HasValue && endDate.HasValue)
-            {
-                // Get time blocks within date range
-                var (blocks, _) = await timeBlockRepository.GetTimeBlocksByDateRangeAsync(startDate.Value, endDate.Value, targetTenantId);
-                timeBlocks = blocks;
-            }
-            else
-            {
-                // Get all time blocks for tenant
-                timeBlocks = await timeBlockRepository.GetTimeBlocksByTenantAsync(targetTenantId);
-            }
-
-            var response = timeBlocks.Select(tb => new TimeBlockResponse
+        var response = new PaginatedResponse<TimeBlockResponse>
+        {
+            Offset = pagination.Offset,
+            Limit = pagination.Limit,
+            TotalCount = totalCount,
+            Data = timeBlocks.Select(tb => new TimeBlockResponse
             {
                 Id = tb.Id,
                 TenantId = tb.TenantId,
@@ -75,367 +62,543 @@ public class TimeBlockController(
                 EndDateTime = tb.EndDateTime,
                 Type = tb.Type,
                 Reason = tb.Reason,
-                RecurrencePattern = tb.RecurrencePattern,
                 IsRecurring = tb.IsRecurring,
-                ExternalEventId = tb.ExternalEventId,
                 CreatedAt = tb.CreatedAt,
                 UpdatedAt = tb.UpdatedAt
-            });
+            }).ToList()
+        };
 
-            return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error getting time blocks");
-            return StatusCode(500, new { Message = "Internal server error" });
-        }
+        return Ok(response);
     }
-
-    /// <summary>
-    /// Get a specific time block by ID
-    /// </summary>
-    /// <param name="id">Time block ID</param>
-    /// <returns>Time block details</returns>
+    
     [HttpGet("time-blocks/{id}")]
     public async Task<IActionResult> GetTimeBlockById(Guid id)
     {
-        try
+        logger.LogInformation("Getting time block: {Id}", id);
+
+        var timeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
+        if (timeBlock == null)
         {
-            logger.LogInformation("Getting time block: {Id}", id);
-
-            var timeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
-            if (timeBlock == null)
-            {
-                return NotFound(new { Message = "Time block not found" });
-            }
-
-            // Validate tenant access
-            userContextService.ValidateTenantAccess(timeBlock.TenantId, "TimeBlock");
-
-            var response = new TimeBlockResponse
-            {
-                Id = timeBlock.Id,
-                TenantId = timeBlock.TenantId,
-                StartDateTime = timeBlock.StartDateTime,
-                EndDateTime = timeBlock.EndDateTime,
-                Type = timeBlock.Type,
-                Reason = timeBlock.Reason,
-                RecurrencePattern = timeBlock.RecurrencePattern,
-                IsRecurring = timeBlock.IsRecurring,
-                ExternalEventId = timeBlock.ExternalEventId,
-                CreatedAt = timeBlock.CreatedAt,
-                UpdatedAt = timeBlock.UpdatedAt
-            };
-
-            return Ok(response);
+            throw new NotFoundException("TimeBlock", id);
         }
-        catch (Exception ex)
+
+        // Validate provider access
+        userContextService.ValidateProviderAccess();
+
+        // Ensure the time block belongs to the provider's tenant
+        var providerTenantId = userContextService.GetTenantId();
+        if (timeBlock.TenantId != providerTenantId)
         {
-            logger.LogError(ex, "Error getting time block: {Id}", id);
-            return StatusCode(500, new { Message = "Internal server error" });
+            throw new AuthorizationException("timeBlock", "access", "You are not authorized to access this time block");
         }
+
+        var response = new TimeBlockResponse
+        {
+            Id = timeBlock.Id,
+            TenantId = timeBlock.TenantId,
+            StartDateTime = timeBlock.StartDateTime,
+            EndDateTime = timeBlock.EndDateTime,
+            Type = timeBlock.Type,
+            Reason = timeBlock.Reason,
+            IsRecurring = timeBlock.IsRecurring,
+            CreatedAt = timeBlock.CreatedAt,
+            UpdatedAt = timeBlock.UpdatedAt
+        };
+
+        return Ok(response);
     }
-
-    /// <summary>
-    /// Create a new time block
-    /// </summary>
-    /// <param name="request">Time block creation request</param>
-    /// <returns>Created time block</returns>
+    
     [HttpPost("time-blocks")]
     public async Task<IActionResult> CreateTimeBlock([FromBody] CreateTimeBlockRequest request)
     {
-        try
+        // Validate provider access
+        userContextService.ValidateProviderAccess();
+
+        // Get tenant ID from JWT token
+        var tenantId = userContextService.GetTenantId();
+
+        logger.LogInformation("Creating time block for tenant: {TenantId}, type: {Type}", tenantId, request.Type);
+
+        // Validate time range
+        if (request.StartDateTime >= request.EndDateTime)
         {
-            // Validate provider access
-            userContextService.ValidateProviderAccess();
-
-            // Get tenant ID from JWT token
-            var tenantId = userContextService.GetTenantId();
-
-            logger.LogInformation("Creating time block for tenant: {TenantId}, type: {Type}", tenantId, request.Type);
-
-            // Validate time range
-            if (request.StartDateTime >= request.EndDateTime)
-            {
-                return BadRequest(new { Message = "Start time must be before end time" });
-            }
-
-            // Validate recurrence pattern if provided
-            if (request.RecurrencePattern != null)
-            {
-                var validationErrors = ValidateRecurrencePattern(request.RecurrencePattern);
-                if (validationErrors.Any())
-                {
-                    return BadRequest(new { Message = "Invalid recurrence pattern", Errors = validationErrors });
-                }
-            }
-
-            var timeBlock = new TimeBlock
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                StartDateTime = request.StartDateTime,
-                EndDateTime = request.EndDateTime,
-                Type = request.Type,
-                Reason = request.Reason,
-                RecurrencePattern = request.RecurrencePattern,
-                ExternalEventId = request.ExternalEventId,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            await timeBlockRepository.CreateTimeBlockAsync(timeBlock);
-
-            var response = new TimeBlockResponse
-            {
-                Id = timeBlock.Id,
-                TenantId = timeBlock.TenantId,
-                StartDateTime = timeBlock.StartDateTime,
-                EndDateTime = timeBlock.EndDateTime,
-                Type = timeBlock.Type,
-                Reason = timeBlock.Reason,
-                RecurrencePattern = timeBlock.RecurrencePattern,
-                IsRecurring = timeBlock.IsRecurring,
-                ExternalEventId = timeBlock.ExternalEventId,
-                CreatedAt = timeBlock.CreatedAt,
-                UpdatedAt = timeBlock.UpdatedAt
-            };
-
-            return CreatedAtAction(nameof(GetTimeBlockById), new { id = timeBlock.Id }, response);
+            throw new ValidationException("Start time must be before end time",
+                new List<ValidationError> { new ValidationError { Field = "startDateTime", Message = "Start time must be before end time" } });
         }
-        catch (Exception ex)
+
+        // Validate dates are not in the past
+        var today = DateTime.UtcNow.Date;
+        if (request.StartDateTime.Date < today)
         {
-            logger.LogError(ex, "Error creating time block");
-            return StatusCode(500, new { Message = "Internal server error" });
+            throw new ValidationException("Start date cannot be in the past",
+                new List<ValidationError> { new ValidationError { Field = "startDateTime", Message = "Start date cannot be in the past" } });
         }
+        if (request.EndDateTime.Date < today)
+        {
+            throw new ValidationException("End date cannot be in the past",
+                new List<ValidationError> { new ValidationError { Field = "endDateTime", Message = "End date cannot be in the past" } });
+        }
+
+        // Validate and convert recurrence pattern if provided
+        RecurrencePattern? recurrencePatternEntity = null;
+        if (request.RecurrencePattern != null)
+        {
+            var validationErrors = ValidateRecurrencePattern(request.RecurrencePattern, request.StartDateTime);
+            if (validationErrors.Any())
+            {
+                var errors = validationErrors.Select(e => new ValidationError { Field = "recurrencePattern", Message = e }).ToList();
+                throw new ValidationException("Invalid recurrence pattern", errors);
+            }
+            recurrencePatternEntity = ConvertToRecurrencePattern(request.RecurrencePattern, request.StartDateTime);
+        }
+
+        // Generate RecurrenceId for this pattern
+        var recurrenceId = recurrencePatternEntity != null ? Guid.NewGuid() : (Guid?)null;
+
+        var timeBlock = new TimeBlock
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            StartDateTime = request.StartDateTime,
+            EndDateTime = request.EndDateTime,
+            Type = ParseTimeBlockType(request.Type),
+            Reason = request.Reason,
+            RecurrenceId = recurrenceId
+        };
+
+        await timeBlockRepository.CreateTimeBlockAsync(timeBlock);
+
+        int totalCreated = 1; // Count the master timeblock
+
+        // Generate recurring blocks if pattern provided
+        if (request.RecurrencePattern != null && recurrenceId.HasValue)
+        {
+            var recurringBlocks = await recurrenceService.GenerateRecurringTimeBlocksAsync(
+                recurrencePatternEntity!,
+                request.StartDateTime,
+                request.EndDateTime,
+                recurrenceId.Value,
+                tenantId,
+                ParseTimeBlockType(request.Type),
+                request.Reason
+            );
+            totalCreated += recurringBlocks.Count;
+        }
+
+        var response = new CreateTimeBlockResponse
+        {
+            Id = timeBlock.Id,
+            TenantId = timeBlock.TenantId,
+            StartDateTime = timeBlock.StartDateTime,
+            EndDateTime = timeBlock.EndDateTime,
+            Type = timeBlock.Type,
+            Reason = timeBlock.Reason,
+            IsRecurring = timeBlock.IsRecurring,
+            CreatedAt = timeBlock.CreatedAt,
+            UpdatedAt = timeBlock.UpdatedAt,
+            TotalCreated = totalCreated
+        };
+
+        return CreatedAtAction(nameof(GetTimeBlockById), new { id = timeBlock.Id }, response);
     }
-
-    /// <summary>
-    /// Update an existing time block
-    /// </summary>
-    /// <param name="id">Time block ID</param>
-    /// <param name="request">Update request</param>
-    /// <returns>Updated time block</returns>
-    [HttpPut("time-blocks/{id}")]
-    public async Task<IActionResult> UpdateTimeBlock(Guid id, [FromBody] UpdateTimeBlockRequest request)
+    
+    [HttpPatch("time-blocks/{id}")]
+    public async Task<IActionResult> PatchTimeBlock(Guid id, [FromBody] PatchTimeBlockRequest request, [FromQuery] bool editPattern = false)
     {
-        try
+        // Validate provider access
+        userContextService.ValidateProviderAccess();
+
+        // Get tenant ID from JWT token
+        var tenantId = userContextService.GetTenantId();
+
+        logger.LogInformation("Updating time block: {Id} for tenant: {TenantId}", id, tenantId);
+
+        // Check if time block exists and belongs to this tenant first
+        var existingTimeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
+        if (existingTimeBlock == null)
         {
-            // Validate provider access
-            userContextService.ValidateProviderAccess();
+            throw new NotFoundException("TimeBlock", id);
+        }
 
-            // Get tenant ID from JWT token
-            var tenantId = userContextService.GetTenantId();
+        if (existingTimeBlock.TenantId != tenantId)
+        {
+            throw new AuthorizationException("timeBlock", "update", "You are not authorized to update this time block");
+        }
 
-            logger.LogInformation("Updating time block: {Id} for tenant: {TenantId}", id, tenantId);
-
-            // Validate time range
-            if (request.StartDateTime >= request.EndDateTime)
+        // Validate time range
+        if (request.StartTime.HasValue && request.EndTime.HasValue)
+        {
+            if (request.StartTime.Value >= request.EndTime.Value)
             {
-                return BadRequest(new { Message = "Start time must be before end time" });
+                throw new ValidationException("Start time must be before end time",
+                    new List<ValidationError> { new ValidationError { Field = "startTime", Message = "Start time must be before end time" } });
             }
-
-            // Validate recurrence pattern if provided
-            if (request.RecurrencePattern != null)
+        }
+        else if (request.EndTime.HasValue)
+        {
+            var existingStartTime = existingTimeBlock.StartDateTime.TimeOfDay;
+            if (request.EndTime.Value.CompareTo(existingStartTime) <= 0)
             {
-                var validationErrors = ValidateRecurrencePattern(request.RecurrencePattern);
-                if (validationErrors.Any())
+                throw new ValidationException("End time must be after current start time",
+                    new List<ValidationError> { new ValidationError { Field = "endTime", Message = "End time must be after current start time" } });
+            }
+        }
+        else if (request.StartTime.HasValue)
+        {
+            var existingEndTime = existingTimeBlock.EndDateTime.TimeOfDay;
+            if (request.StartTime.Value.CompareTo(existingEndTime) >= 0)
+            {
+                throw new ValidationException("Start time must be before current end time",
+                    new List<ValidationError> { new ValidationError { Field = "startTime", Message = "Start time must be before current end time" } });
+            }
+        }
+        if (existingTimeBlock == null)
+        {
+            throw new NotFoundException("TimeBlock", id);
+        }
+
+        if (existingTimeBlock.TenantId != tenantId)
+        {
+            throw new AuthorizationException("timeBlock", "update", "You are not authorized to update this time block");
+        }
+
+        // Create update request with time-only changes
+        var updateRequest = new Database.UpdateModels.UpdateTimeBlock
+        {
+            Type = request.Type != null ? ParseTimeBlockType(request.Type) : null,
+            Reason = request.Reason
+        };
+
+        // Convert TimeOnly to DateTime while preserving the date
+        if (request.StartTime.HasValue)
+            updateRequest.StartDateTime = existingTimeBlock.StartDateTime.Date + request.StartTime.Value.ToTimeSpan();
+
+        if (request.EndTime.HasValue)
+            updateRequest.EndDateTime = existingTimeBlock.EndDateTime.Date + request.EndTime.Value.ToTimeSpan();
+
+        // If this is a recurring time block and editPattern is true, update all blocks
+        if (editPattern && existingTimeBlock.RecurrenceId.HasValue)
+        {
+            // Get all blocks with the same RecurrenceId
+            var allBlocks = await timeBlockRepository.GetTimeBlocksByRecurrenceIdAsync(existingTimeBlock.RecurrenceId.Value, tenantId);
+
+            foreach (var block in allBlocks)
+            {
+                var blockUpdate = new Database.UpdateModels.UpdateTimeBlock
                 {
-                    return BadRequest(new { Message = "Invalid recurrence pattern", Errors = validationErrors });
-                }
+                    Type = request.Type != null ? ParseTimeBlockType(request.Type) : null,
+                    Reason = request.Reason
+                };
+
+                // Apply same time changes to each block, preserving their dates
+                if (request.StartTime.HasValue)
+                    blockUpdate.StartDateTime = block.StartDateTime.Date + request.StartTime.Value.ToTimeSpan();
+
+                if (request.EndTime.HasValue)
+                    blockUpdate.EndDateTime = block.EndDateTime.Date + request.EndTime.Value.ToTimeSpan();
+
+                await timeBlockRepository.UpdateTimeBlockAsync(block.Id, blockUpdate);
             }
-
-            // Check if time block exists and belongs to this tenant
-            var existingTimeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
-            if (existingTimeBlock == null)
-            {
-                return NotFound(new { Message = "Time block not found" });
-            }
-
-            if (existingTimeBlock.TenantId != tenantId)
-            {
-                return Forbid();
-            }
-
-            var updateRequest = new Database.UpdateModels.UpdateTimeBlock
-            {
-                StartDateTime = request.StartDateTime,
-                EndDateTime = request.EndDateTime,
-                Type = request.Type,
-                Reason = request.Reason,
-                RecurrencePattern = request.RecurrencePattern,
-                ExternalEventId = request.ExternalEventId
-            };
-
+        }
+        else
+        {
+            // Update only this specific time block
             var success = await timeBlockRepository.UpdateTimeBlockAsync(id, updateRequest);
             if (!success)
             {
-                return StatusCode(500, new { Message = "Failed to update time block" });
+                throw new DatabaseOperationException("Failed to update time block");
             }
-
-            // Get updated time block
-            var updatedTimeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
-            if (updatedTimeBlock == null)
-            {
-                return StatusCode(500, new { Message = "Time block not found after update" });
-            }
-
-            var response = new TimeBlockResponse
-            {
-                Id = updatedTimeBlock.Id,
-                TenantId = updatedTimeBlock.TenantId,
-                StartDateTime = updatedTimeBlock.StartDateTime,
-                EndDateTime = updatedTimeBlock.EndDateTime,
-                Type = updatedTimeBlock.Type,
-                Reason = updatedTimeBlock.Reason,
-                RecurrencePattern = updatedTimeBlock.RecurrencePattern,
-                IsRecurring = updatedTimeBlock.IsRecurring,
-                ExternalEventId = updatedTimeBlock.ExternalEventId,
-                CreatedAt = updatedTimeBlock.CreatedAt,
-                UpdatedAt = updatedTimeBlock.UpdatedAt
-            };
-
-            return Ok(response);
         }
-        catch (Exception ex)
+
+        // Get updated time block
+        var updatedTimeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
+        if (updatedTimeBlock == null)
         {
-            logger.LogError(ex, "Error updating time block: {Id}", id);
-            return StatusCode(500, new { Message = "Internal server error" });
+            throw new DatabaseOperationException("Time block not found after update");
         }
+
+        var response = new TimeBlockResponse
+        {
+            Id = updatedTimeBlock.Id,
+            TenantId = updatedTimeBlock.TenantId,
+            StartDateTime = updatedTimeBlock.StartDateTime,
+            EndDateTime = updatedTimeBlock.EndDateTime,
+            Type = updatedTimeBlock.Type,
+            Reason = updatedTimeBlock.Reason,
+            IsRecurring = updatedTimeBlock.IsRecurring,
+            CreatedAt = updatedTimeBlock.CreatedAt,
+            UpdatedAt = updatedTimeBlock.UpdatedAt
+        };
+
+        return Ok(response);
     }
 
-    /// <summary>
-    /// Delete a time block
-    /// </summary>
-    /// <param name="id">Time block ID</param>
-    /// <returns>No content if successful</returns>
+
     [HttpDelete("time-blocks/{id}")]
-    public async Task<IActionResult> DeleteTimeBlock(Guid id)
+    public async Task<IActionResult> DeleteTimeBlock(Guid id, [FromQuery] bool deletePattern = false)
     {
-        try
+        // Validate provider access
+        userContextService.ValidateProviderAccess();
+
+        // Get tenant ID from JWT token
+        var tenantId = userContextService.GetTenantId();
+
+        logger.LogInformation("Deleting time block: {Id} for tenant: {TenantId}, deletePattern: {DeletePattern}", id, tenantId, deletePattern);
+
+        // Check if time block exists and belongs to this tenant
+        var existingTimeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
+        if (existingTimeBlock == null)
         {
-            // Validate provider access
-            userContextService.ValidateProviderAccess();
+            throw new NotFoundException("TimeBlock", id);
+        }
 
-            // Get tenant ID from JWT token
-            var tenantId = userContextService.GetTenantId();
+        if (existingTimeBlock.TenantId != tenantId)
+        {
+            throw new AuthorizationException("timeBlock", "delete", "You are not authorized to delete this time block");
+        }
 
-            logger.LogInformation("Deleting time block: {Id} for tenant: {TenantId}", id, tenantId);
-
-            // Check if time block exists and belongs to this tenant
-            var existingTimeBlock = await timeBlockRepository.GetTimeBlockByIdAsync(id);
-            if (existingTimeBlock == null)
-            {
-                return NotFound(new { Message = "Time block not found" });
-            }
-
-            if (existingTimeBlock.TenantId != tenantId)
-            {
-                return Forbid();
-            }
-
-            var success = await timeBlockRepository.DeleteTimeBlockAsync(id);
+        // If deletePattern is true and this time block has a RecurrenceId, delete all blocks in the pattern
+        if (deletePattern && existingTimeBlock.RecurrenceId.HasValue)
+        {
+            await recurrenceService.DeleteRecurringTimeBlocksAsync(existingTimeBlock.RecurrenceId.Value, tenantId);
+            logger.LogInformation("Deleted all time blocks in pattern {RecurrenceId}", existingTimeBlock.RecurrenceId.Value);
+        }
+        else
+        {
+            // Delete only this specific time block
+            var success = await timeBlockRepository.DeleteTimeBlockAsync(id, tenantId);
             if (!success)
             {
-                return StatusCode(500, new { Message = "Failed to delete time block" });
+                throw new DatabaseOperationException("Failed to delete time block");
             }
+        }
 
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error deleting time block: {Id}", id);
-            return StatusCode(500, new { Message = "Internal server error" });
-        }
+        return NoContent();
     }
 
-    /// <summary>
-    /// Bulk delete time blocks within a date range
-    /// </summary>
-    /// <param name="request">Bulk delete request with date range</param>
-    /// <returns>Count of deleted time blocks</returns>
-    [HttpDelete("time-blocks/bulk")]
-    public async Task<IActionResult> BulkDeleteTimeBlocks([FromBody] BulkDeleteTimeBlocksRequest request)
+
+    [HttpDelete("time-blocks/range")]
+    public async Task<IActionResult> DeleteTimeBlocksByDateRange([FromBody] BulkDeleteTimeBlocksRequest request)
     {
-        try
+        // Validate provider access
+        userContextService.ValidateProviderAccess();
+
+        // Get tenant ID from JWT token
+        var tenantId = userContextService.GetTenantId();
+
+        logger.LogInformation("Deleting time blocks for tenant: {TenantId}, startDate: {StartDate}, endDate: {EndDate}",
+            tenantId, request.StartDate, request.EndDate);
+
+        // Validate date range
+        if (request.StartDate >= request.EndDate)
         {
-            // Validate provider access
-            userContextService.ValidateProviderAccess();
-
-            // Get tenant ID from JWT token
-            var tenantId = userContextService.GetTenantId();
-
-            logger.LogInformation("Bulk deleting time blocks for tenant: {TenantId}, startDate: {StartDate}, endDate: {EndDate}",
-                tenantId, request.StartDate, request.EndDate);
-
-            // Validate date range
-            if (request.StartDate >= request.EndDate)
-            {
-                return BadRequest(new { Message = "Start date must be before end date" });
-            }
-
-            // Validate reasonable date ranges
-            if (request.EndDate < DateTime.UtcNow.Date)
-            {
-                return BadRequest(new { Message = "End date cannot be in the past" });
-            }
-
-            if (request.StartDate > DateTime.UtcNow.AddYears(1))
-            {
-                return BadRequest(new { Message = "Start date cannot be more than 1 year in the future" });
-            }
-
-            var deletedCount = await timeBlockRepository.DeleteTimeBlocksByDateRangeAsync(request.StartDate, request.EndDate, tenantId);
-
-            logger.LogInformation("Successfully deleted {Count} time blocks for tenant: {TenantId}", deletedCount, tenantId);
-
-            return Ok(new
-            {
-                Message = "Time blocks deleted successfully",
-                DeletedCount = deletedCount
-            });
+            throw new ValidationException("Start date must be before end date",
+                new List<ValidationError> { new ValidationError { Field = "startDate", Message = "Start date must be before end date" } });
         }
-        catch (Exception ex)
+
+        var deletedCount = await timeBlockRepository.DeleteTimeBlocksByDateRangeAsync(request.StartDate, request.EndDate, tenantId);
+
+        logger.LogInformation("Successfully deleted {Count} time blocks for tenant: {TenantId}", deletedCount, tenantId);
+
+        return Ok(new
         {
-            logger.LogError(ex, "Error bulk deleting time blocks for date range: {StartDate} to {EndDate}", request.StartDate, request.EndDate);
-            return StatusCode(500, new { Message = "Internal server error" });
-        }
+            Message = "Time blocks deleted successfully",
+            DeletedCount = deletedCount
+        });
     }
 
-    private List<string> ValidateRecurrencePattern(RecurrencePattern pattern)
+    private List<string> ValidateRecurrencePattern(RecurrencePatternRequest pattern, DateTime originalStartDateTime)
     {
         var errors = new List<string>();
 
-        if (pattern.Frequency == RecurrenceFrequency.Weekly && (pattern.DaysOfWeek == null || !pattern.DaysOfWeek.Any()))
+        // Validate frequency and interval
+        if (pattern.Interval.HasValue && pattern.Interval.Value < 1)
         {
-            errors.Add("Days of week must be specified for weekly recurrence pattern");
+            errors.Add("Interval must be a positive number");
         }
 
-        if (pattern.Frequency == RecurrenceFrequency.Monthly && pattern.DayOfMonth == null)
+        // Validate end condition - exactly one is required
+        if (pattern.EndDate.HasValue && pattern.MaxOccurrences.HasValue)
         {
-            errors.Add("Day of month must be specified for monthly recurrence pattern");
+            errors.Add("Cannot specify both EndDate and MaxOccurrences. Please provide only one.");
+        }
+        else if (!pattern.EndDate.HasValue && !pattern.MaxOccurrences.HasValue)
+        {
+            errors.Add("Must specify either EndDate or MaxOccurrences to define when the recurrence ends.");
         }
 
-        if (pattern.DayOfMonth.HasValue && (pattern.DayOfMonth < 1 || pattern.DayOfMonth > 31))
-        {
-            errors.Add("Day of month must be between 1 and 31");
-        }
-
-        if (pattern.Interval < 1)
-        {
-            errors.Add("Interval must be greater than 0");
-        }
-
+        // Validate end date is not in the past
         if (pattern.EndDate.HasValue && pattern.EndDate.Value < DateTime.UtcNow.Date)
         {
             errors.Add("End date cannot be in the past");
         }
 
+        // Validate max occurrences
         if (pattern.MaxOccurrences.HasValue && pattern.MaxOccurrences.Value <= 0)
         {
-            errors.Add("Max occurrences must be greater than 0");
+            errors.Add("MaxOccurrences must be greater than 0");
+        }
+
+        // Frequency-specific validations
+        switch (pattern.Frequency.ToLowerInvariant())
+        {
+            case "daily":
+                if (pattern.DaysOfWeek != null && pattern.DaysOfWeek.Length > 0)
+                {
+                    errors.Add("Daily recurrence cannot include DaysOfWeek. Use Weekly frequency instead.");
+                }
+                if (pattern.DaysOfMonth != null && pattern.DaysOfMonth.Length > 0)
+                {
+                    errors.Add("Daily recurrence cannot include DaysOfMonth. Use Monthly frequency instead.");
+                }
+                break;
+
+            case "weekly":
+                if (pattern.DaysOfMonth != null && pattern.DaysOfMonth.Length > 0)
+                {
+                    errors.Add("Weekly recurrence cannot include DaysOfMonth.");
+                }
+
+                // Validate DaysOfWeek if provided
+                if (pattern.DaysOfWeek != null)
+                {
+                    if (pattern.DaysOfWeek.Any(d => d < 0 || d > 6))
+                    {
+                        errors.Add("DaysOfWeek must contain values between 0 (Sunday) and 6 (Saturday)");
+                    }
+                    if (pattern.DaysOfWeek.Length != pattern.DaysOfWeek.Distinct().Count())
+                    {
+                        errors.Add("DaysOfWeek cannot contain duplicate values");
+                    }
+
+                    // Check if original day is in the specified days
+                    var originalDayOfWeek = (int)originalStartDateTime.DayOfWeek;
+                    if (!pattern.DaysOfWeek.Contains(originalDayOfWeek))
+                    {
+                        errors.Add($"The original time block is on {originalStartDateTime.DayOfWeek}, but this day is not included in the DaysOfWeek array.");
+                    }
+                }
+                break;
+
+            case "monthly":
+                if (pattern.DaysOfWeek != null && pattern.DaysOfWeek.Length > 0)
+                {
+                    errors.Add("Monthly recurrence cannot include DaysOfWeek.");
+                }
+
+                // If DaysOfMonth not provided, use the original day
+                if (pattern.DaysOfMonth == null || pattern.DaysOfMonth.Length == 0)
+                {
+                    // This will be handled in ConvertToRecurrencePattern
+                }
+                else
+                {
+                    // Validate DaysOfMonth
+                    foreach (var day in pattern.DaysOfMonth)
+                    {
+                        if (day == 0 || day < -31 || day > 31)
+                        {
+                            errors.Add("DaysOfMonth must be between -31 and -1, or 1 and 31");
+                        }
+                        else if (day < -1 && day > -31)
+                        {
+                            errors.Add($"DaysOfMonth special value {day} is invalid. Use -1 for last day, -2 for second to last, etc.");
+                        }
+                    }
+
+                    // Check if original day matches any of the specified days
+                    var originalDay = originalStartDateTime.Day;
+                    var lastDayOfMonth = DateTime.DaysInMonth(originalStartDateTime.Year, originalStartDateTime.Month);
+
+                    bool dayMatches = pattern.DaysOfMonth.Contains(originalDay) ||
+                                     (pattern.DaysOfMonth.Contains(-1) && originalDay == lastDayOfMonth) ||
+                                     (pattern.DaysOfMonth.Contains(-2) && originalDay == lastDayOfMonth - 1) ||
+                                     (pattern.DaysOfMonth.Contains(-3) && originalDay == lastDayOfMonth - 2);
+
+                    if (!dayMatches)
+                    {
+                        errors.Add($"The original time block is on day {originalDay}, but this day is not included in the DaysOfMonth array.");
+                    }
+                }
+                break;
+
+            default:
+                errors.Add("Frequency must be one of: Daily, Weekly, Monthly");
+                break;
         }
 
         return errors;
+    }
+
+    private RecurrencePattern ConvertToRecurrencePattern(RecurrencePatternRequest request, DateTime originalStartDateTime)
+    {
+        var frequency = request.Frequency.ToLowerInvariant() switch
+        {
+            "daily" => RecurrenceFrequency.Daily,
+            "weekly" => RecurrenceFrequency.Weekly,
+            "monthly" => RecurrenceFrequency.Monthly,
+            _ => throw new ValidationException("Invalid frequency",
+                new List<ValidationError> { new ValidationError { Field = "frequency", Message = $"Invalid frequency: {request.Frequency}" } })
+        };
+
+        var pattern = new RecurrencePattern
+        {
+            Frequency = frequency,
+            Interval = request.Interval ?? 1,
+            EndDate = request.EndDate,
+            MaxOccurrences = request.MaxOccurrences
+        };
+
+        // Weekly: Always set DaysOfWeek - if not provided, use the original day
+        if (frequency == RecurrenceFrequency.Weekly)
+        {
+            if (request.DaysOfWeek != null && request.DaysOfWeek.Length > 0)
+            {
+                pattern.DaysOfWeek = request.DaysOfWeek.Select(d => (DayOfWeek)d).ToArray();
+            }
+            else
+            {
+                // Default to the original day
+                pattern.DaysOfWeek = new[] { originalStartDateTime.DayOfWeek };
+            }
+        }
+
+        if (request.DaysOfMonth != null && request.DaysOfMonth.Length > 0)
+        {
+            pattern.DaysOfMonth = request.DaysOfMonth;
+        }
+        else if (frequency == RecurrenceFrequency.Monthly)
+        {
+            // For monthly patterns without explicit days, use the original day
+            pattern.DaysOfMonth = new[] { originalStartDateTime.Day };
+        }
+
+        return pattern;
+    }
+
+    private void ValidateDaysOfMonth(int[] daysOfMonth, List<string> errors)
+    {
+        foreach (var day in daysOfMonth)
+        {
+            if (day == 0 || day < -31 || day > 31)
+                errors.Add("DaysOfMonth must be between -31 and -1, or 1 and 31");
+            else if (day < -1 && day > -31)
+                errors.Add($"DaysOfMonth special value {day} is invalid. Use -1 for last day, -2 for second to last, etc.");
+        }
+    }
+
+    private static TimeBlockType ParseTimeBlockType(string type)
+    {
+        return type.ToLowerInvariant() switch
+        {
+            "vacation" => TimeBlockType.Vacation,
+            "break" => TimeBlockType.Break,
+            "custom" => TimeBlockType.Custom,
+            _ => throw new ValidationException("Invalid time block type",
+                new List<ValidationError>
+                {
+                    new ValidationError { Field = "type", Message = $"Invalid time block type: {type}. Valid types are: Vacation, Break, Custom" }
+                })
+        };
     }
 }
