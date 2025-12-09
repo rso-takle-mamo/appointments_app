@@ -12,6 +12,23 @@ public class AvailabilityController(
     IUserContextService userContextService)
     : BaseApiController
 {
+    /// <summary>
+    /// Get available time slots for booking
+    /// </summary>
+    /// <remarks>
+    /// **CUSTOMERS:**
+    /// - Must provide tenantId query parameter
+    /// - Can check availability for any tenant
+    ///
+    /// **PROVIDERS:**
+    /// - Cannot provide tenantId parameter
+    /// - Can only check availability for their own tenant
+    /// - Date range cannot exceed 1 month
+    /// </remarks>
+    /// <param name="tenantId">Tenant ID (required for customers, forbidden for providers)</param>
+    /// <param name="startDate">Start date for availability check (required, format: 2026-01-01Z)</param>
+    /// <param name="endDate">End date for availability check (required, format: 2026-01-01Z)</param>
+    /// <returns>List of available time ranges</returns>
     [HttpGet("slots")]
     public async Task<IActionResult> GetAvailableSlots(
         [FromQuery] Guid? tenantId = null,
@@ -35,15 +52,6 @@ public class AvailabilityController(
                 throw new ValidationException("Date range cannot exceed 1 month",
                     new List<ValidationError> {
                         new ValidationError { Field = "endDate", Message = "Date range cannot exceed 1 month" }
-                    });
-            }
-
-            // Validate dates are not in the past
-            if (startDate.Value < DateTime.UtcNow.Date)
-            {
-                throw new ValidationException("Start date cannot be in the past",
-                    new List<ValidationError> {
-                        new ValidationError { Field = "startDate", Message = "Start date cannot be in the past" }
                     });
             }
 

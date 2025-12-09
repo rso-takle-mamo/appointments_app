@@ -19,6 +19,19 @@ public class TimeBlockController(
     IUserContextService userContextService)
     : BaseApiController
 {
+    /// <summary>
+    /// Get time blocks (unavailable periods) for the provider's tenant
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only access their own time blocks
+    /// - Supports pagination
+    /// - Optional date range filtering
+    /// </remarks>
+    /// <param name="pagination">Pagination parameters (offset and limit)</param>
+    /// <param name="startDate">Optional start date to filter time blocks (format: 2026-01-01Z)</param>
+    /// <param name="endDate">Optional end date to filter time blocks (format: 2026-01-01Z)</param>
+    /// <returns>Paginated list of time blocks</returns>
     [HttpGet("time-blocks")]
     public async Task<IActionResult> GetTimeBlocks([FromQuery] PaginationParameters pagination, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
     {
@@ -70,7 +83,15 @@ public class TimeBlockController(
 
         return Ok(response);
     }
-    
+      /// <summary>
+    /// Get a specific time block by ID
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only access time blocks belonging to their tenant
+    /// </remarks>
+    /// <param name="id">Time block ID</param>
+    /// <returns>Time block details</returns>
     [HttpGet("time-blocks/{id}")]
     public async Task<IActionResult> GetTimeBlockById(Guid id)
     {
@@ -107,7 +128,33 @@ public class TimeBlockController(
 
         return Ok(response);
     }
-    
+
+    /// <summary>
+    /// Create a new time block (unavailable period)
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only create time blocks for their own tenant
+    /// - Supports recurring patterns with the following options:
+    ///   - **Daily**: Repeats every day or every N days
+    ///     - Use `interval` to specify days between occurrences
+    ///     - Example: Every 2 days = interval: 2
+    ///   - **Weekly**: Repeats every week or every N weeks on specific days
+    ///     - Use `interval` for weeks between occurrences
+    ///     - Use `daysOfWeek` array (0=Sunday, 6=Saturday)
+    ///     - Example: Every week on Mon, Wed, Fri = interval: 1, daysOfWeek: [1, 3, 5]
+    ///   - **Monthly**: Repeats every month or every N months on specific days
+    ///     - Use `interval` for months between occurrences
+    ///     - Use `daysOfMonth` array (1-31 for specific days, negative for from end)
+    ///     - Example: Every month on 15th and last day = interval: 1, daysOfMonth: [15, -1]
+    /// - Cannot create time blocks in the past
+    /// - Types: Vacation, Break, Custom
+    /// - **End Condition** (required for recurrence):
+    ///   - `endDate`: Last date for recurrence (exclusive)
+    ///   - `maxOccurrences`: Maximum number of occurrences to create
+    /// </remarks>
+    /// <param name="request">Time block details including optional recurrence pattern</param>
+    /// <returns>Created time block with count of total blocks created (for recurring)</returns>
     [HttpPost("time-blocks")]
     public async Task<IActionResult> CreateTimeBlock([FromBody] CreateTimeBlockRequest request)
     {
@@ -201,7 +248,19 @@ public class TimeBlockController(
 
         return CreatedAtAction(nameof(GetTimeBlockById), new { id = timeBlock.Id }, response);
     }
-    
+      /// <summary>
+    /// Update a time block (partial update)
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only update time blocks belonging to their tenant
+    /// - For recurring blocks, use editPattern=true to update all occurrences
+    /// - editPattern=false updates only the specific instance
+    /// </remarks>
+    /// <param name="id">Time block ID</param>
+    /// <param name="request">Fields to update</param>
+    /// <param name="editPattern">Whether to edit the entire recurring pattern (for recurring time blocks)</param>
+    /// <returns>Updated time block</returns>
     [HttpPatch("time-blocks/{id}")]
     public async Task<IActionResult> PatchTimeBlock(Guid id, [FromBody] PatchTimeBlockRequest request, [FromQuery] bool editPattern = false)
     {
@@ -334,6 +393,18 @@ public class TimeBlockController(
     }
 
 
+    /// <summary>
+    /// Delete a time block
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only delete time blocks belonging to their tenant
+    /// - For recurring blocks, use deletePattern=true to delete all occurrences
+    /// - deletePattern=false deletes only the specific instance
+    /// </remarks>
+    /// <param name="id">Time block ID</param>
+    /// <param name="deletePattern">Whether to delete the entire recurring pattern (for recurring time blocks)</param>
+    /// <returns>No content on successful deletion</returns>
     [HttpDelete("time-blocks/{id}")]
     public async Task<IActionResult> DeleteTimeBlock(Guid id, [FromQuery] bool deletePattern = false)
     {
@@ -377,6 +448,17 @@ public class TimeBlockController(
     }
 
 
+    /// <summary>
+    /// Delete multiple time blocks within a date range
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only delete time blocks belonging to their tenant
+    /// - Deletes all time blocks that fall within the specified date range
+    /// - Useful for clearing vacation periods or bulk operations
+    /// </remarks>
+    /// <param name="request">Date range for bulk deletion</param>
+    /// <returns>Summary of deleted time blocks</returns>
     [HttpDelete("time-blocks/range")]
     public async Task<IActionResult> DeleteTimeBlocksByDateRange([FromBody] BulkDeleteTimeBlocksRequest request)
     {

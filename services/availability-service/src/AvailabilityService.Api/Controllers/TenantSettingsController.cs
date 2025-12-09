@@ -15,6 +15,15 @@ public class TenantSettingsController(
     IUserContextService userContextService)
     : BaseApiController
 {
+    /// <summary>
+    /// Get buffer settings for the provider's tenant
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Buffer time is added before and after appointments
+    /// - Default values are 0 minutes
+    /// </remarks>
+    /// <returns>Buffer settings in minutes</returns>
     [HttpGet("tenant-settings/buffer")]
     public async Task<IActionResult> GetBufferSettings()
     {
@@ -46,6 +55,17 @@ public class TenantSettingsController(
     }
 
 
+/// <summary>
+    /// Update buffer settings for the provider's tenant
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Buffer time is added before and after appointments
+    /// - Used to prevent back-to-back bookings
+    /// - Helps with preparation time between appointments
+    /// </remarks>
+    /// <param name="request">Buffer settings to update</param>
+    /// <returns>Updated buffer settings</returns>
     [HttpPatch("tenant-settings/buffer")]
     public async Task<IActionResult> UpdateBufferSettings([FromBody] PatchBufferSettingsRequest request)
     {
@@ -84,7 +104,15 @@ public class TenantSettingsController(
             return BadRequest(new { Message = ex.Message });
         }
     }
-    
+      /// <summary>
+    /// Reset buffer settings to default values (0 minutes)
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Resets both bufferBefore and bufferAfter to 0
+    /// - This removes any buffer time between appointments
+    /// </remarks>
+    /// <returns>No content on successful reset</returns>
     [HttpDelete("tenant-settings/buffer")]
     public async Task<IActionResult> ResetBufferSettings()
     {

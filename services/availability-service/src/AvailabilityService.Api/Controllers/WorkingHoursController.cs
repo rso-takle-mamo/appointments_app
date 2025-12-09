@@ -19,6 +19,21 @@ public class WorkingHoursController(
     IUserContextService userContextService)
     : BaseApiController
 {
+    /// <summary>
+    /// Get working hours for a tenant
+    /// </summary>
+    /// <remarks>
+    /// **CUSTOMERS:**
+    /// - Must provide tenantId query parameter
+    /// - Can view working hours for any tenant
+    ///
+    /// **PROVIDERS:**
+    /// - Cannot provide tenantId parameter
+    /// - Can only view their own working hours
+    /// </remarks>
+    /// <param name="tenantId">Tenant ID (required for customers, forbidden for providers)</param>
+    /// <param name="day">Optional day of week to filter by</param>
+    /// <returns>List of working hours</returns>
     [HttpGet("working-hours")]
     public async Task<IActionResult> GetWorkingHours([FromQuery] Guid? tenantId = null, [FromQuery] DayOfWeek? day = null)
     {
@@ -74,7 +89,16 @@ public class WorkingHoursController(
 
             return Ok(response);
     }
-    
+    /// <summary>
+    /// Create working hours for a specific day
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only create working hours for their own tenant
+    /// - Cannot create working hours if they already exist for the day (use PUT to update)
+    /// </remarks>
+    /// <param name="request">Working hours details</param>
+    /// <returns>Created working hours</returns>
     [HttpPost("working-hours")]
     public async Task<IActionResult> CreateWorkingHours([FromBody] CreateWorkingHoursRequest request)
     {
@@ -133,7 +157,18 @@ public class WorkingHoursController(
 
         return CreatedAtAction(nameof(GetWorkingHours), new { tenantId = workingHours.TenantId, day = workingHours.Day }, response);
     }
-    
+  
+    /// <summary>
+    /// Create weekly schedule in batch
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Replaces all existing working hours with new schedule
+    /// - Allows setting work-free days
+    /// - Each schedule entry can apply to multiple days
+    /// </remarks>
+    /// <param name="request">Weekly schedule details</param>
+    /// <returns>Summary of created schedule</returns>
     [HttpPost("working-hours/batch")]
     public async Task<IActionResult> CreateWeeklySchedule([FromBody] CreateWeeklyScheduleRequest request)
     {
@@ -211,74 +246,17 @@ public class WorkingHoursController(
                     .ToList()
             });
     }
-    
-    [HttpPut("working-hours/{id}")]
-    public async Task<IActionResult> UpdateWorkingHours(Guid id, [FromBody] UpdateWorkingHoursRequest request)
-    {
-            // Validate provider access
-        userContextService.ValidateProviderAccess();
-
-        // Get tenant ID from JWT token
-        var tenantId = userContextService.GetTenantId();
-
-        logger.LogInformation("Updating working hours: {Id} for tenant: {TenantId}", id, tenantId);
-
-        // Validate time range
-        if (request.StartTime >= request.EndTime)
-        {
-            throw new ValidationException("Start time must be before end time",
-                new List<ValidationError> {
-                    new ValidationError { Field = "startTime", Message = "Start time must be before end time" }
-                });
-        }
-
-        // Check if working hours exists and belongs to this tenant
-        var existingWorkingHours = await workingHoursRepository.GetWorkingHoursByIdAsync(id);
-        if (existingWorkingHours == null)
-        {
-            throw new NotFoundException("WorkingHours", id);
-        }
-
-        if (existingWorkingHours.TenantId != tenantId)
-        {
-            throw new AuthorizationException("workingHours", "update", "You are not authorized to update these working hours");
-        }
-
-        var updateRequest = new UpdateWorkingHours
-        {
-            StartTime = request.StartTime,
-            EndTime = request.EndTime,
-            MaxConcurrentBookings = request.MaxConcurrentBookings
-        };
-
-        var success = await workingHoursRepository.UpdateWorkingHoursAsync(id, updateRequest);
-        if (!success)
-        {
-            throw new DatabaseOperationException("Failed to update working hours");
-        }
-
-        // Get updated working hours
-        var updatedWorkingHours = await workingHoursRepository.GetWorkingHoursByIdAsync(id);
-        if (updatedWorkingHours == null)
-        {
-            throw new DatabaseOperationException("Working hours not found after update");
-        }
-
-        var response = new WorkingHoursResponse
-        {
-            Id = updatedWorkingHours.Id,
-            TenantId = updatedWorkingHours.TenantId,
-            Day = updatedWorkingHours.Day,
-            StartTime = updatedWorkingHours.StartTime,
-            EndTime = updatedWorkingHours.EndTime,
-            MaxConcurrentBookings = updatedWorkingHours.MaxConcurrentBookings,
-            CreatedAt = updatedWorkingHours.CreatedAt,
-            UpdatedAt = updatedWorkingHours.UpdatedAt
-        };
-
-        return Ok(response);
-    }
-
+        
+    /// <summary>
+    /// Delete working hours
+    /// </summary>
+    /// <remarks>
+    /// **PROVIDERS ONLY**
+    /// - Can only delete working hours belonging to their tenant
+    /// - Working hours must exist before deletion
+    /// </remarks>
+    /// <param name="id">Working hours ID</param>
+    /// <returns>No content on successful deletion</returns>
     [HttpDelete("working-hours/{id}")]
     public async Task<IActionResult> DeleteWorkingHours(Guid id)
     {
