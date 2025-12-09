@@ -18,6 +18,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AvailabilityService.Databas
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AvailabilityService.DatabaseMIgrator", "services\availability-service\src\AvailabilityService.DatabaseMIgrator\AvailabilityService.DatabaseMIgrator.csproj", "{266CECA5-EE51-4664-B6E4-D702930BC40B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookingService.Api", "services\booking-service\src\BookingService.Api\BookingService.Api.csproj", "{453F267E-D2E4-462E-9E0E-62DEF9D607DE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookingService.Database", "services\booking-service\src\BookingService.Database\BookingService.Database.csproj", "{737064BE-D06F-4127-A987-384240314FB9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookingService.DatabaseMigrator", "services\booking-service\src\BookingService.DatabaseMigrator\BookingService.DatabaseMigrator.csproj", "{354F023E-48BC-4A70-80FA-80FF851926BC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -60,5 +66,17 @@ Global
 		{266CECA5-EE51-4664-B6E4-D702930BC40B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{266CECA5-EE51-4664-B6E4-D702930BC40B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{266CECA5-EE51-4664-B6E4-D702930BC40B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{453F267E-D2E4-462E-9E0E-62DEF9D607DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{453F267E-D2E4-462E-9E0E-62DEF9D607DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{453F267E-D2E4-462E-9E0E-62DEF9D607DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{453F267E-D2E4-462E-9E0E-62DEF9D607DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{737064BE-D06F-4127-A987-384240314FB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{737064BE-D06F-4127-A987-384240314FB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{737064BE-D06F-4127-A987-384240314FB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{737064BE-D06F-4127-A987-384240314FB9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{354F023E-48BC-4A70-80FA-80FF851926BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{354F023E-48BC-4A70-80FA-80FF851926BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{354F023E-48BC-4A70-80FA-80FF851926BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{354F023E-48BC-4A70-80FA-80FF851926BC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

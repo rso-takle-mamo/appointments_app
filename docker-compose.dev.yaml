@@ -122,6 +122,40 @@ services:
       - migration
     networks:
       - appointments-network
+  
+  booking-service:
+    build:
+      context: ./services/booking-service/src
+      dockerfile: BookingService.Api/Dockerfile
+    container_name: appointments-booking-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8000
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${BOOKING_DB_NAME};Username=${BOOKING_DB_USERNAME};Password=${BOOKING_DB_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - appointments-network
+    restart: unless-stopped
+
+  booking-service-migrator:
+    build:
+      context: ./services/booking-service/src
+      dockerfile: BookingService.DatabaseMigrator/Dockerfile
+    container_name: appointments-booking-migrator
+    environment:
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${BOOKING_DB_NAME};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - DATABASE_USERNAME=${USER_DB_USERNAME}
+      - DATABASE_PASSWORD=${USER_DB_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    profiles:
+      - migration
+    networks:
+      - appointments-network
 
 volumes:
   postgres_data:
