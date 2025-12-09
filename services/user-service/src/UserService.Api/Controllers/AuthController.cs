@@ -11,48 +11,48 @@ namespace UserService.Api.Controllers;
 [Route("api/auth")]
 public class AuthController(IAuthService authService) : ControllerBase
 {
+    /// <summary>
+    /// Register a new customer account
+    /// </summary>
+    /// <param name="request">The customer registration details</param>
+    /// <returns>JWT token for authentication</returns>
     [HttpPost("register/customer")]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
     public async Task<IActionResult> RegisterCustomer([FromBody] CustomerRegisterRequest request)
     {
         var response = await authService.RegisterCustomerAsync(request);
         return Ok(response);
     }
-    
+  
+    /// <summary>
+    /// Register a new provider account with tenant information
+    /// </summary>
+    /// <param name="request">The provider registration details including business information</param>
+    /// <returns>JWT token for authentication</returns>
     [HttpPost("register/provider")]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
     public async Task<IActionResult> RegisterProvider([FromBody] ProviderRegisterRequest request)
     {
         var response = await authService.RegisterProviderAsync(request);
         return Ok(response);
     }
     
+    /// <summary>
+    /// Authenticate user and return JWT token
+    /// </summary>
+    /// <param name="request">User login credentials</param>
+    /// <returns>JWT token for authentication</returns>
     [HttpPost("login")]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var response = await authService.LoginAsync(request);
         return Ok(response);
     }
     
+    /// <summary>
+    /// Logout user and invalidate the current session
+    /// </summary>
+    /// <returns>Success message</returns>
     [HttpPost("logout")]
     [Authorize]
-    [Produces("application/json")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
     public async Task<IActionResult> Logout()
     {
         var authorizationHeader = Request.Headers.Authorization.ToString();

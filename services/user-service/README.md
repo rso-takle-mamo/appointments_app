@@ -22,39 +22,30 @@ The UserService manages user authentication, profiles, and tenant information fo
 | `CreatedAt` | TIMESTAMPTZ | Required | Creation timestamp |
 | `UpdatedAt` | TIMESTAMPTZ | Required | Last update timestamp |
 
-**Indexes:**
-- `IX_Users_Username` (Unique)
-- `IX_Users_TenantId`
 
 #### Tenants Table
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `Id` | UUID | Primary Key | Tenant identifier |
-| `OwnerId` | UUID | Required, Unique | User who owns this tenant |
-| `BusinessName` | VARCHAR(255) | Required | Business name |
-| `BusinessEmail` | VARCHAR(255) | Nullable | Business email |
-| `BusinessPhone` | VARCHAR(50) | Nullable | Business phone |
-| `Address` | VARCHAR(500) | Nullable | Business address |
-| `Description` | TEXT | Nullable | Business description |
-| `CreatedAt` | TIMESTAMPTZ | Required | Creation timestamp |
-| `UpdatedAt` | TIMESTAMPTZ | Required | Last update timestamp |
+| Column | Type          | Constraints | Description |
+|--------|---------------|-------------|-------------|
+| `Id` | UUID          | Primary Key | Tenant identifier |
+| `OwnerId` | UUID          | Required, Unique | User who owns this tenant |
+| `BusinessName` | VARCHAR(255)  | Required | Business name |
+| `BusinessEmail` | VARCHAR(255)  | Nullable | Business email |
+| `BusinessPhone` | VARCHAR(50)   | Nullable | Business phone |
+| `Address` | VARCHAR(500)  | Nullable | Business address |
+| `Description` | VARCHAR(1000) | Nullable | Business description |
+| `CreatedAt` | TIMESTAMPTZ   | Required | Creation timestamp |
+| `UpdatedAt` | TIMESTAMPTZ   | Required | Last update timestamp |
 
-**Indexes:**
-- `IX_Tenants_OwnerId` (Unique)
 
 #### UserSessions Table
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `Id` | UUID | Primary Key | Session identifier |
 | `UserId` | UUID | Required, Indexed | Reference to user |
-| `TokenJti` | TEXT | Required, Unique | JWT token identifier |
+| `TokenJti` | VARCHAR(255) | Required, Unique | JWT token identifier |
 | `CreatedAt` | TIMESTAMPTZ | Required | Session creation time |
 | `ExpiresAt` | TIMESTAMPTZ | Required | Session expiration time |
 
-**Indexes:**
-- `IX_UserSessions_UserId`
-- `IX_UserSessions_TokenJti` (Unique)
-- `IX_UserSessions_ExpiresAt`
 
 ### Database Relationships
 1. **Users → Tenants:** One-to-many via `TenantId` (user can belong to one tenant)
@@ -62,7 +53,6 @@ The UserService manages user authentication, profiles, and tenant information fo
 3. **Users → UserSessions:** One-to-many (user can have multiple sessions)
 
 ### Foreign Key Constraints
-- `FK_Users_Tenants_TenantId` → `Tenants(Id)` (ON DELETE SET NULL)
 - `FK_Tenants_Users_OwnerId` → `Users(Id)` (ON DELETE CASCADE)
 - `FK_UserSessions_Users_UserId` → `Users(Id)` (ON DELETE CASCADE)
 

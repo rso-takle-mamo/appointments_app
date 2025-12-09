@@ -8,30 +8,9 @@ namespace UserService.Database;
 
 public static class UserDatabaseExtensions
 {
-    public static void AddUserDatabase(this IServiceCollection services, IConfiguration configuration)
+    public static void AddUserDatabase(this IServiceCollection services)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? EnvironmentVariables.GetRequiredVariable("DATABASE_CONNECTION_STRING");
-
-        services.AddDbContext<UserDbContext>(options =>
-        {
-            options.UseNpgsql(connectionString, npgsqlOptions =>
-            {
-                npgsqlOptions.EnableRetryOnFailure(
-                    maxRetryCount: 3,
-                    maxRetryDelay: TimeSpan.FromSeconds(5),
-                    errorCodesToAdd: null);
-            });
-
-            // Enable sensitive data logging in development only
-            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
-            {
-                options.EnableSensitiveDataLogging();
-                options.EnableDetailedErrors();
-            }
-        });
-
-        // Register repositories
+        services.AddDbContext<UserDbContext>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserSessionRepository, UserSessionRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();

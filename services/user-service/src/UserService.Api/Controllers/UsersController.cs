@@ -15,11 +15,11 @@ namespace UserService.Api.Controllers;
 [Route("api/users")]
 public class UsersController(IUserService userService) : BaseApiController
 {
+    /// <summary>
+    /// Get current user profile
+    /// </summary>
+    /// <returns>User profile information</returns>
     [HttpGet("me")]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ErrorResponse))]
     public async Task<IActionResult> GetProfile()
     {
         var userId = GetUserIdFromToken();
@@ -27,15 +27,13 @@ public class UsersController(IUserService userService) : BaseApiController
         return Ok(profile);
     }
     
+    /// <summary>
+    /// Update current user profile
+    /// </summary>
+    /// <param name="request">User profile update information</param>
+    /// <returns>Updated user profile</returns>
     [HttpPatch("me")]
     [ServiceFilter(typeof(ModelValidationFilter))]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ErrorResponse))]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateUserRequest request)
     {
         var userId = GetUserIdFromToken();
@@ -43,11 +41,11 @@ public class UsersController(IUserService userService) : BaseApiController
         return Ok(updatedProfile);
     }
     
+    /// <summary>
+    /// Delete current user account
+    /// </summary>
+    /// <returns>No content on successful deletion</returns>
     [HttpDelete("me")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ErrorResponse))]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError, Type = typeof(ErrorResponse))]
     public async Task<IActionResult> DeleteUser()
     {
         var userId = GetUserIdFromToken();

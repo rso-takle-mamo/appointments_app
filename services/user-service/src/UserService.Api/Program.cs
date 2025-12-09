@@ -57,6 +57,15 @@ if (builder.Environment.IsDevelopment())
         });
         
         c.OperationFilter<AuthorizeOperationFilter>();
+
+        // Include XML Comments in Swagger
+        var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (File.Exists(xmlPath))
+        {
+            c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+        }
+        c.EnableAnnotations();
     });
 }
 
@@ -86,7 +95,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddUserDatabase(builder.Configuration);
+builder.Services.AddUserDatabase();
 
 builder.Services.AddHealthChecks()
     .AddCheck("self", () =>

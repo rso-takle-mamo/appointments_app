@@ -9,10 +9,18 @@ public class UserDbContext : DbContext
     public UserDbContext() { }
 
     public UserDbContext(DbContextOptions<UserDbContext> options) : base(options) { }
-
+    
     public DbSet<User> Users { get; set; }
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<UserSession> UserSessions { get; set; }
+    
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseNpgsql(EnvironmentVariables.GetRequiredVariable("DATABASE_CONNECTION_STRING"));
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,24 +37,19 @@ public class UserDbContext : DbContext
         // Automatically set UpdatedAt timestamp
         var entries = ChangeTracker
             .Entries()
-            .Where(e => e.Entity is User || e.Entity is Tenant &&
-                (e.State == EntityState.Added || e.State == EntityState.Modified));
+            .Where(e => e.Entity is User || e.Entity is Tenant || e.Entity is UserSession
+                && (e.State == EntityState.Added || e.State == EntityState.Modified));
   
         foreach (var entityEntry in entries)
         {
-            if (entityEntry.State == EntityState.Added)
+            switch (entityEntry.State)
             {
-                if (entityEntry.Entity is User user)
-                    user.CreatedAt = DateTime.UtcNow;
-                else if (entityEntry.Entity is Tenant tenant)
-                    tenant.CreatedAt = DateTime.UtcNow;
-            }
-            else if (entityEntry.State == EntityState.Modified)
-            {
-                if (entityEntry.Entity is User user)
-                    user.UpdatedAt = DateTime.UtcNow;
-                else if (entityEntry.Entity is Tenant tenant)
-                    tenant.UpdatedAt = DateTime.UtcNow;
+                case EntityState.Added:
+                    ((dynamic)entityEntry.Entity).CreatedAt = DateTime.UtcNow;
+                    break;
+                case EntityState.Modified:
+                    ((dynamic)entityEntry.Entity).UpdatedAt = DateTime.UtcNow;
+                    break;
             }
         }
   

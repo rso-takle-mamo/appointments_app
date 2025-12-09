@@ -28,30 +28,32 @@ public class AuthService(IUserRepository userRepository, IJwtTokenService jwtTok
             throw new AuthenticationException("login", "Invalid username or password");
         }
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
-
-        try
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            await sessionService.InvalidateUserSessionsAsync(user.Id);
-
-            await transaction.CommitAsync();
-
-            var token = jwtTokenService.GenerateToken(user, out var tokenJti);
-            var expiresAt = DateTime.UtcNow.AddHours(24);
-
-            await sessionService.CreateSessionAsync(user.Id, tokenJti, expiresAt);
-
-            return new TokenResponse
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+            try
             {
-                AccessToken = token,
-                ExpiresIn = expiresAt
-            };
-        }
-        catch (Exception)
+                await sessionService.InvalidateUserSessionsAsync(user.Id);
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
+
+        var token = jwtTokenService.GenerateToken(user, out var tokenJti);
+        var expiresAt = DateTime.UtcNow.AddHours(24);
+
+        await sessionService.CreateSessionAsync(user.Id, tokenJti, expiresAt);
+
+        return new TokenResponse
         {
-            await transaction.RollbackAsync();
-            throw;
-        }
+            AccessToken = token,
+            ExpiresIn = expiresAt
+        };
     }
     
     public async Task LogoutAsync(string token)
@@ -102,44 +104,48 @@ public class AuthService(IUserRepository userRepository, IJwtTokenService jwtTok
             throw new ConflictException("username", "Username already exists");
         }
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
-
-        try
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        User user = await strategy.ExecuteAsync(async () =>
         {
-            var user = new User
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+            try
             {
-                Id = Guid.NewGuid(),
-                Username = request.Username,
-                Password = request.Password,
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Email = request.Email,
-                Role = UserRole.Customer,
-                TenantId = null,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                var newUser = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Username = request.Username,
+                    Password = request.Password,
+                    FirstName = request.FirstName,
+                    LastName = request.LastName,
+                    Email = request.Email,
+                    Role = UserRole.Customer,
+                    TenantId = null,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
 
-            await userRepository.Create(user);
+                await userRepository.Create(newUser);
+                await transaction.CommitAsync();
 
-            await transaction.CommitAsync();
-
-            var token = jwtTokenService.GenerateToken(user, out var tokenJti);
-            var expiresAt = DateTime.UtcNow.AddHours(24);
-
-            await sessionService.CreateSessionAsync(user.Id, tokenJti, expiresAt);
-
-            return new TokenResponse
+                return newUser;
+            }
+            catch
             {
-                AccessToken = token,
-                ExpiresIn = expiresAt
-            };
-        }
-        catch (Exception)
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
+
+        var token = jwtTokenService.GenerateToken(user, out var tokenJti);
+        var expiresAt = DateTime.UtcNow.AddHours(24);
+
+        await sessionService.CreateSessionAsync(user.Id, tokenJti, expiresAt);
+
+        return new TokenResponse
         {
-            await transaction.RollbackAsync();
-            throw;
-        }
+            AccessToken = token,
+            ExpiresIn = expiresAt
+        };
     }
     
     public async Task<TokenResponse> RegisterProviderAsync(ProviderRegisterRequest request)
@@ -150,62 +156,67 @@ public class AuthService(IUserRepository userRepository, IJwtTokenService jwtTok
             throw new ConflictException("username", "Username already exists");
         }
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
-
-        try
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        User user = await strategy.ExecuteAsync(async () =>
         {
-            var user = new User
+            await using var transaction = await dbContext.Database.BeginTransactionAsync();
+            try
             {
-                Id = Guid.NewGuid(),
-                Username = request.Username,
-                Password = request.Password,
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Email = request.Email,
-                Role = UserRole.Provider,
-                TenantId = null,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                var newUser = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Username = request.Username,
+                    Password = request.Password,
+                    FirstName = request.FirstName,
+                    LastName = request.LastName,
+                    Email = request.Email,
+                    Role = UserRole.Provider,
+                    TenantId = null,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
 
-            await userRepository.Create(user);
+                await userRepository.Create(newUser);
 
-            var tenant = new Tenant
+                var tenant = new Tenant
+                {
+                    Id = Guid.NewGuid(),
+                    OwnerId = newUser.Id,
+                    BusinessName = request.BusinessName,
+                    BusinessEmail = request.BusinessEmail,
+                    BusinessPhone = request.BusinessPhone,
+                    Address = request.Address,
+                    Description = request.Description,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await tenantRepository.CreateAsync(tenant);
+
+                newUser.TenantId = tenant.Id;
+                newUser.UpdatedAt = DateTime.UtcNow;
+                await userRepository.UpdateAsync(newUser);
+
+                await transaction.CommitAsync();
+
+                return newUser;
+            }
+            catch
             {
-                Id = Guid.NewGuid(),
-                OwnerId = user.Id,
-                BusinessName = request.BusinessName,
-                BusinessEmail = request.BusinessEmail,
-                BusinessPhone = request.BusinessPhone,
-                Address = request.Address,
-                Description = request.Description,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
 
-            await tenantRepository.CreateAsync(tenant);
+        var token = jwtTokenService.GenerateToken(user, out var tokenJti);
+        var expiresAt = DateTime.UtcNow.AddHours(24);
 
-            user.TenantId = tenant.Id;
-            user.UpdatedAt = DateTime.UtcNow;
-            await userRepository.UpdateAsync(user);
+        await sessionService.CreateSessionAsync(user.Id, tokenJti, expiresAt);
 
-            await transaction.CommitAsync();
-
-            var token = jwtTokenService.GenerateToken(user, out var tokenJti);
-            var expiresAt = DateTime.UtcNow.AddHours(24);
-
-            await sessionService.CreateSessionAsync(user.Id, tokenJti, expiresAt);
-
-            return new TokenResponse
-            {
-                AccessToken = token,
-                ExpiresIn = expiresAt
-            };
-        }
-        catch (Exception)
+        return new TokenResponse
         {
-            await transaction.RollbackAsync();
-            throw;
-        }
+            AccessToken = token,
+            ExpiresIn = expiresAt
+        };
     }
 }
