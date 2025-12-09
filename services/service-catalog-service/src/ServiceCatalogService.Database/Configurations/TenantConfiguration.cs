@@ -11,6 +11,9 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.ToTable("Tenants");
 
         builder.HasKey(t => t.Id);
+        
+        builder.Property(t => t.Id)
+            .HasDefaultValueSql("gen_random_uuid()");
 
         builder.Property(t => t.BusinessName)
             .IsRequired()
@@ -20,8 +23,12 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .IsRequired()
             .HasMaxLength(500);
 
-        builder.Property(t => t.CreatedAt);
+        builder.Property(t => t.CreatedAt)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP")
+            .ValueGeneratedOnAdd();
 
-        builder.Property(t => t.UpdatedAt);
+        builder.Property(t => t.UpdatedAt)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP")
+            .ValueGeneratedOnAdd();
     }
 }

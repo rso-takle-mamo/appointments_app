@@ -11,7 +11,7 @@ public class ServiceFilterRequest
     // Price filtering
     [Range(0, 9999999999.99, ErrorMessage = "Minimum price must be between 0 and 9,999,999,999.99")]
     public decimal? MinPrice { get; set; }
-
+    
     [Range(0, 9999999999.99, ErrorMessage = "Maximum price must be between 0 and 9,999,999,999.99")]
     public decimal? MaxPrice { get; set; }
 

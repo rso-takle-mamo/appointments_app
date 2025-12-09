@@ -9,49 +9,45 @@ The ServiceCatalogService manages service and category information for the appoi
 ### Tables and Schema
 
 #### Services Table
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `Id` | UUID | Primary Key | Service identifier |
-| `TenantId` | UUID | Required, Foreign Key | Reference to tenant |
-| `Name` | VARCHAR(255) | Required | Service name |
-| `Description` | TEXT | Nullable | Service description |
-| `Price` | DECIMAL(18,2) | Required | Service price |
-| `DurationMinutes` | INTEGER | Required | Service duration in minutes |
-| `CategoryId` | UUID | Foreign Key, Nullable | Reference to category |
-| `IsActive` | BOOLEAN | Required | Whether service is active |
-| `CreatedAt` | TIMESTAMPTZ | Required | Creation timestamp |
-| `UpdatedAt` | TIMESTAMPTZ | Required | Last update timestamp |
+| Column | Type          | Constraints                                           | Description |
+|--------|---------------|-------------------------------------------------------|-------------|
+| `Id` | UUID          | Primary Key                                           | Service identifier |
+| `TenantId` | UUID          | Required, Foreign Key                                 | Reference to tenant |
+| `Name` | VARCHAR(255)  | Required                                              | Service name |
+| `Description` | VARCHAR(1000) | Nullable                                              | Service description |
+| `Price` | NUMERIC(10,2) | Required, Price >= 0                                  | Service price |
+| `DurationMinutes` | INTEGER       | Required, DurationMinutes > 0, DurationMinutes <= 480 | Service duration in minutes |
+| `CategoryId` | UUID          | Foreign Key, Nullable                                 | Reference to category |
+| `IsActive` | BOOLEAN       | Required                                              | Whether service is active |
+| `CreatedAt` | TIMESTAMPTZ   | Required                                              | Creation timestamp |
+| `UpdatedAt` | TIMESTAMPTZ   | Required                                              | Last update timestamp |
 
-**Indexes:**
-- `IX_Services_TenantId`
-- `IX_Services_CategoryId`
 
 #### Categories Table
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `Id` | UUID | Primary Key | Category identifier |
-| `TenantId` | UUID | Required, Foreign Key | Reference to tenant |
-| `Name` | VARCHAR(255) | Required | Category name |
-| `Description` | TEXT | Nullable | Category description |
-| `CreatedAt` | TIMESTAMPTZ | Required | Creation timestamp |
-| `UpdatedAt` | TIMESTAMPTZ | Required | Last update timestamp |
+| Column | Type         | Constraints | Description |
+|--------|--------------|-------------|-------------|
+| `Id` | UUID         | Primary Key | Category identifier |
+| `TenantId` | UUID         | Required, Foreign Key | Reference to tenant |
+| `Name` | VARCHAR(100) | Required | Category name |
+| `Description` | VARCHAR(500) | Nullable | Category description |
+| `CreatedAt` | TIMESTAMPTZ  | Required | Creation timestamp |
+| `UpdatedAt` | TIMESTAMPTZ  | Required | Last update timestamp |
 
-**Indexes:**
-- `IX_Categories_TenantId`
 
 #### Tenants Table
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `Id` | UUID | Primary Key | Tenant identifier |
-| `BusinessName` | VARCHAR(255) | Required | Business name |
-| `Address` | VARCHAR(500) | Required | Business address |
-| `CreatedAt` | TIMESTAMPTZ | Required | Creation timestamp |
-| `UpdatedAt` | TIMESTAMPTZ | Required | Last update timestamp |
+**Note:** This table replicates data from the UserService for service catalog queries. TODO: Add Kafka/RabbitMQ to synchronize it.
 
-**Note:** This table is a data replication from the UserService for service catalog queries. TODO: Add Kafka to synchronize it.
+| Column | Type         | Constraints | Description |
+|--------|--------------|-------------|-------------|
+| `Id` | UUID         | Primary Key | Tenant identifier |
+| `BusinessName` | VARCHAR(200) | Required | Business name |
+| `Address` | VARCHAR(500) | Required | Business address |
+| `CreatedAt` | TIMESTAMPTZ  | Required | Creation timestamp |
+| `UpdatedAt` | TIMESTAMPTZ  | Required | Last update timestamp |
+
 
 ### Database Relationships
-1. **Services → Categories:** Many-to-one via `CategoryId` (service can belong to one category)
+1. **Services → Categories:** Many-to-one via `CategoryId` ( Multiple services can belong to one category, but a service doesn't need a category)
 2. **Categories → Services:** One-to-many (category can have multiple services)
 3. **Services/Categories → Tenants:** Many-to-one via `TenantId` (service/category belongs to one tenant)
 
@@ -72,10 +68,13 @@ Authorization: Bearer <token>
 **Authentication:** Required (JWT token)
 **Description:** Lists services with filtering and pagination
 
-**Query Parameters:**
-- `offset` (int, default: 0): Number of items to skip
-- `limit` (int, default: 100): Maximum number of items to return (1-100)
-- `tenantId` (guid, optional): Filter by tenant ID (customers only)
+#### Query Parameters:
+**Customer only params:**
+- `tenantId` (guid, required for customers, forbidden for providers): Filter by tenant ID
+- `address` (string, optional): Filter by tenant address (max 500 chars)
+- `businessName` (string, optional): Filter by tenant business name (max 200 chars)
+
+**Filters:**
 - `serviceName` (string, optional): Filter by service name (max 100 chars)
 - `categoryId` (guid, optional): Filter by category ID
 - `categoryName` (string, optional): Filter by category name (max 100 chars)
@@ -83,8 +82,10 @@ Authorization: Bearer <token>
 - `maxPrice` (decimal, optional): Maximum price filter (0-9,999,999,999.99)
 - `maxDuration` (int, optional): Maximum duration filter in minutes (1-480)
 - `isActive` (bool, optional): Filter by active status
-- `address` (string, optional): Filter by tenant address (customers only, max 500 chars)
-- `businessName` (string, optional): Filter by tenant business name (customers only, max 200 chars)
+
+**Pagination and sorting:**
+- `offset` (int, default: 0): Number of items to skip
+- `limit` (int, default: 100): Maximum number of items to return (1-100)
 - `orderBy` (enum, optional): Sort field (Name, Price, Duration)
 - `orderDirection` (enum, optional): Sort direction (Ascending, Descending)
 
@@ -105,10 +106,10 @@ Authorization: Bearer <token>
       "categoryId": "789e1234-e89b-12d3-a456-426614174002",
       "categoryName": "Consulting",
       "isActive": true,
+      "businessName": "Professional Services Inc",
+      "address": "123 Business St, City, State 12345",
       "createdAt": "2024-01-01T10:00:00Z",
       "updatedAt": "2024-01-01T10:00:00Z",
-      "businessName": "Professional Services Inc",
-      "address": "123 Business St, City, State 12345"
     }
   ]
 }
@@ -231,9 +232,31 @@ Authorization: Bearer <token>
 **Query Parameters:**
 - `tenantId` (guid, required for customers): Tenant ID filter
 
+- `offset` (int, default: 0): Number of items to skip
+- `limit` (int, default: 100): Maximum number of items to return (1-100)
+
 **Note:**
 - **Customers:** Must provide `tenantId` parameter
 - **Providers:** Auto-filtered by their tenant, cannot specify tenantId
+
+**Response:**
+```json
+{
+  "offset": 0,
+  "limit": 100,
+  "totalCount": 1,
+  "data": [
+    {
+      "id": "789e1234-e89b-12d3-a456-426614174002",
+      "tenantId": "456e7890-e89b-12d3-a456-426614174001",
+      "name": "Consulting",
+      "description": "Professional consulting services",
+      "createdAt": "2024-01-01T09:00:00Z",
+      "updatedAt": "2024-01-01T09:00:00Z"
+    }
+  ]
+}
+```
 
 #### Get Category by ID (Providers Only)
 ```http
@@ -296,7 +319,7 @@ Authorization: Bearer <token>
 ```
 
 **Validation Rules:**
-- `name`: Optional, max 100 chars, alphanumeric with spaces, hyphens, and periods
+- `name`: Optional, max 100 chars
 - `description`: Optional, max 500 characters
 
 #### Delete Category (Providers Only)

@@ -35,6 +35,23 @@ public class CategoryRepository(ServiceCatalogDbContext context) : ICategoryRepo
             .ToListAsync();
     }
 
+    public async Task<(IReadOnlyCollection<Category>, int TotalCount)> GetCategoriesByTenantIdAsync(Guid tenantId, int offset, int limit)
+    {
+        var query = context.Categories
+            .Where(c => c.TenantId == tenantId)
+            .OrderBy(c => c.Name)
+            .AsNoTracking();
+
+        var totalCount = await query.CountAsync();
+
+        var categories = await query
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync();
+
+        return (categories, totalCount);
+    }
+
     public async Task CreateCategoryAsync(Category category)
     {
         category.Id = Guid.NewGuid();

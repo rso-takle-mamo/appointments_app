@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ServiceCatalogService.Api.Middleware;
 using ServiceCatalogService.Api.Services;
+using ServiceCatalogService.Api.Services.Interfaces;
 using ServiceCatalogService.Api.Filters;
 using ServiceCatalogService.Api.Configuration;
 using ServiceCatalogService.Database;
@@ -134,6 +135,10 @@ builder.Services.AddScoped<ModelValidationFilter>();
 
 // Register application services
 builder.Services.AddScoped<IUserContextService, UserContextService>();
+
+// Register business services
+builder.Services.AddScoped<IServiceService, ServiceService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
 
 
 var app = builder.Build();
