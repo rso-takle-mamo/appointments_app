@@ -16,6 +16,19 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel to listen on separate ports for HTTP and gRPC
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // HTTP port for REST API
+    options.ListenAnyIP(8000);
+
+    // HTTP/2 port for gRPC (Note: gRPC over HTTP/2)
+    options.ListenAnyIP(5001, listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2;
+    });
+});
+
 // Add services to the container.
 builder.Services.AddControllers(options =>
 {
@@ -26,6 +39,9 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = false;
 });
+
+// Add gRPC services
+builder.Services.AddGrpc();
 
 // Configure API behavior to suppress automatic model validation response
 builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -94,37 +110,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("ProviderOnly", policy =>
-        policy.RequireClaim("role", "Provider"));
-
-    options.AddPolicy("TenantResource", policy =>
-        policy.RequireAssertion(context =>
-        {
-            // Get tenant ID from JWT token
-            var tenantIdClaim = context.User.FindFirst("tenantId")?.Value;
-            if (string.IsNullOrEmpty(tenantIdClaim))
-                return false;
-
-            // Get route data or query parameter tenantId
-            var routeTenantId = context.Resource as HttpContext;
-            if (routeTenantId != null)
-            {
-                // For GET endpoints, check query parameter
-                var queryTenantId = routeTenantId.Request.Query["tenantId"].FirstOrDefault();
-                if (!string.IsNullOrEmpty(queryTenantId))
-                {
-                    return queryTenantId == tenantIdClaim;
-                }
-
-                // For POST/PUT/DELETE endpoints, the tenantId comes from JWT only
-                return true;
-            }
-
-            return false;
-        }));
-});
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("ProviderOnly", policy =>
+        policy.RequireClaim("role", "Provider"))
+    .AddPolicy("TenantResource", policy =>
+        policy.RequireAuthenticatedUser());
 
 // Database configuration
 builder.Services.AddAvailabilityDatabase();
@@ -166,9 +156,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 
 // Register application services
-builder.Services.AddScoped<AvailabilityService.Api.Services.Interfaces.IAvailabilityService, AvailabilityService.Api.Services.AvailabilityService>();
-builder.Services.AddScoped<AvailabilityService.Api.Services.Interfaces.ITenantSettingsService, AvailabilityService.Api.Services.TenantSettingsService>();
-builder.Services.AddScoped<AvailabilityService.Api.Services.Interfaces.IRecurrenceService, AvailabilityService.Api.Services.RecurrenceService>();
+builder.Services.AddScoped<IAvailabilityService, AvailabilityService.Api.Services.AvailabilityService>();
+builder.Services.AddScoped<ITenantSettingsService, TenantSettingsService>();
+builder.Services.AddScoped<IRecurrenceService, RecurrenceService>();
 
 var app = builder.Build();
 
@@ -202,6 +192,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map gRPC services
+app.MapGrpcService<AvailabilityService.Api.Services.Grpc.AvailabilityGrpcService>();
 
 // Health check endpoints
 app.MapHealthChecks("/health", new HealthCheckOptions

@@ -12,8 +12,8 @@ public class BookingRepository(AvailabilityDbContext context) : IBookingReposito
             .AsNoTracking()
             .Where(b => b.TenantId == tenantId &&
                        (b.BookingStatus == BookingStatus.Confirmed || b.BookingStatus == BookingStatus.Pending) &&
-                       b.StartDateTime < endDate &&
-                       b.EndDateTime > startDate)
+                       b.StartDateTime <= endDate &&
+                       b.EndDateTime >= startDate)
             .ToListAsync();
     }
 }

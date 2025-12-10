@@ -1,26 +1,10 @@
 namespace BookingService.Api.Exceptions;
 
-public class AuthorizationException : BaseDomainException
+public class AuthorizationException(string resource, string action, string message) : BaseDomainException(message)
 {
     public override string ErrorCode => "ACCESS_DENIED";
     
-    public string Resource { get; }
-    
-    public string Action { get; }
+    public string Resource { get; } = resource;
 
-    public AuthorizationException(string message) : base(message) { }
-
-    public AuthorizationException(string resource, string action, string message) : base(message)
-    {
-        Resource = resource;
-        Action = action;
-    }
-
-    public AuthorizationException(string message, Exception innerException) : base(message, innerException) { }
-
-    public AuthorizationException(string resource, string action, string message, Exception innerException) : base(message, innerException)
-    {
-        Resource = resource;
-        Action = action;
-    }
+    public string Action { get; } = action;
 }

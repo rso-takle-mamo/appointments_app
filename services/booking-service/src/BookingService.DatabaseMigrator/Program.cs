@@ -1,7 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using Microsoft.EntityFrameworkCore;
-using AvailabilityService.Database;
+using BookingService.Database;
 
 var dbContext = new BookingDbContext();
 var targetMigration = Environment.GetEnvironmentVariable("TARGET_MIGRATION");

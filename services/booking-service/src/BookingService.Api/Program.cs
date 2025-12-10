@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using HealthChecks.UI.Client;
 using BookingService.Api.Middleware;
 using BookingService.Api.Services.Interfaces;
+using BookingService.Api.Services.Grpc;
 using BookingService.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -93,37 +94,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("ProviderOnly", policy =>
-        policy.RequireClaim("role", "Provider"));
-
-    options.AddPolicy("TenantResource", policy =>
-        policy.RequireAssertion(context =>
-        {
-            // Get tenant ID from JWT token
-            var tenantIdClaim = context.User.FindFirst("tenantId")?.Value;
-            if (string.IsNullOrEmpty(tenantIdClaim))
-                return false;
-
-            // Get route data or query parameter tenantId
-            var routeTenantId = context.Resource as HttpContext;
-            if (routeTenantId != null)
-            {
-                // For GET endpoints, check query parameter
-                var queryTenantId = routeTenantId.Request.Query["tenantId"].FirstOrDefault();
-                if (!string.IsNullOrEmpty(queryTenantId))
-                {
-                    return queryTenantId == tenantIdClaim;
-                }
-
-                // For POST/PUT/DELETE endpoints, the tenantId comes from JWT only
-                return true;
-            }
-
-            return false;
-        }));
-});
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("ProviderOnly", policy =>
+        policy.RequireClaim("role", "Provider"))
+    .AddPolicy("TenantResource", policy =>
+        policy.RequireAuthenticatedUser());
 
 // Database configuration
 builder.Services.AddBookingDatabase();
@@ -156,6 +131,12 @@ builder.Services.AddScoped<ModelValidationFilter>();
 
 // Register services
 builder.Services.AddHttpContextAccessor();
+
+// Configure gRPC client settings
+builder.Services.Configure<AvailabilityServiceGrpcSettings>(builder.Configuration.GetSection("AvailabilityServiceGrpc"));
+
+// Register gRPC client
+builder.Services.AddScoped<IAvailabilityGrpcClient, AvailabilityGrpcClient>();
 
 // Register application services
 builder.Services.AddScoped<IUserContextService, BookingService.Api.Services.UserContextService>();

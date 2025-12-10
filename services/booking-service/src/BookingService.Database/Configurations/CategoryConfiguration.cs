@@ -21,6 +21,14 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Property(e => e.Name)
             .IsRequired()
             .HasMaxLength(255);
+        
+        builder.Property(e => e.CreatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder.Property(e => e.UpdatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         // Indexes
         builder.HasIndex(e => e.TenantId);

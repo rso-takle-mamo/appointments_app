@@ -1,16 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
-using BookingService.Api.Services;
 using BookingService.Api.Services.Interfaces;
 using BookingService.Api.Requests;
 using BookingService.Api.Responses;
+using BookingService.Api.Exceptions;
 
 namespace BookingService.Api.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/bookings")]
 public class BookingsController(
-    ILogger<BookingsController> logger,
     IBookingService bookingService,
-    IUserContextService userContextService) : BaseApiController
+    ILogger<BookingsController> logger,
+    IUserContextService userContextService)
+    : BaseApiController(userContextService)
 {
     /// <summary>
     /// Create a new booking (Customers only)
@@ -26,14 +27,19 @@ public class BookingsController(
     [HttpPost]
     public async Task<ActionResult<BookingResponse>> CreateBooking([FromBody] CreateBookingRequest request)
     {
-        // Only customers can create bookings
-        userContextService.ValidateCustomerAccess();
+        ValidateCustomerAccess();
 
-        var userId = userContextService.GetUserId();
-        var tenantId = userContextService.GetTenantId();
+        var userId = GetUserId();
 
-        logger.LogInformation("Creating booking for user {UserId}, service {ServiceId}, at {StartTime}",
-            userId, request.ServiceId, request.StartDateTime);
+        if (!request.TenantId.HasValue)
+        {
+            throw new AuthorizationException("Booking", "create", "Tenant ID is required.");
+        }
+
+        var tenantId = request.TenantId.Value;
+
+        logger.LogInformation("Creating booking for user {UserId}, service {ServiceId}, tenant {TenantId}, at {StartTime}",
+            userId, request.ServiceId, tenantId, request.StartDateTime);
 
         var booking = await bookingService.CreateBookingAsync(request, userId, tenantId);
 
@@ -58,9 +64,13 @@ public class BookingsController(
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<BookingResponse>> GetBookingById(Guid id)
     {
-        var userId = userContextService.GetUserId();
-        var tenantId = userContextService.GetTenantId();
-        var userRole = userContextService.GetRole();
+        var userId = GetUserId();
+        var isCustomer = IsCustomer();
+
+        // For customers, don't pass tenantId - the service should validate they own the booking
+        // For providers, use their tenantId to validate access
+        var tenantId = isCustomer ? Guid.Empty : (GetTenantId() ?? Guid.Empty);
+        var userRole = GetUserRole();
 
         var booking = await bookingService.GetBookingByIdAsync(id, userId, tenantId, userRole);
 
@@ -77,12 +87,15 @@ public class BookingsController(
     /// </summary>
     /// <remarks>
     /// **CUSTOMERS:**
-    /// Can only retrieve their own bookings
+    /// Can retrieve their own bookings
+    /// Must provide tenantId query parameter to specify which tenant's bookings to view
     ///
     /// **PROVIDERS:**
     /// Can retrieve any bookings within their tenant
+    /// tenantId parameter is forbidden (automatically uses their own tenant)
     ///
     /// Filter options:
+    /// - tenantId: Required for customers, forbidden for providers
     /// - startDate: Filter bookings from this date onwards (UTC)
     /// - endDate: Filter bookings up to this date (UTC)
     /// - status: Filter by booking status (Pending, Confirmed, Completed, Cancelled)
@@ -92,12 +105,38 @@ public class BookingsController(
     [HttpGet]
     public async Task<ActionResult<PaginatedResponse<BookingResponse>>> GetBookings([FromQuery] GetBookingsRequest request)
     {
-        var userId = userContextService.GetUserId();
-        var tenantId = userContextService.GetTenantId();
-        var userRole = userContextService.GetRole();
+        var userId = GetUserId();
+        var userTenantId = GetTenantId();
+        var userRole = GetUserRole();
+        var isCustomer = IsCustomer();
 
-        logger.LogInformation("Retrieving bookings for user {UserId}, role {Role}, with filters: {@Request}",
-            userId, userRole, request);
+        
+        Guid tenantId;
+        if (isCustomer)
+        {
+            // Customers must provide tenantId in query parameters
+            if (!request.TenantId.HasValue)
+            {
+                throw new AuthorizationException("Booking", "read", "Tenant ID is required for customers to retrieve bookings.");
+            }
+            tenantId = request.TenantId.Value;
+        }
+        else
+        {
+            // Providers cannot provide tenantId - they only see their own tenant
+            if (request.TenantId.HasValue)
+            {
+                throw new AuthorizationException("Booking", "read", "Providers cannot specify tenant ID. They can only view their own tenant's bookings.");
+            }
+            if (!userTenantId.HasValue)
+            {
+                throw new AuthorizationException("Booking", "read", "Providers must have a tenant ID.");
+            }
+            tenantId = userTenantId.Value;
+        }
+
+        logger.LogInformation("Retrieving bookings for user {UserId}, role {Role}, tenant {TenantId}, with filters: {@Request}",
+            userId, userRole, tenantId, request);
 
         var (bookings, totalCount) = await bookingService.GetBookingsAsync(request, userId, tenantId, userRole);
 
@@ -118,16 +157,13 @@ public class BookingsController(
     [HttpPut("{id:guid}/cancel")]
     public async Task<ActionResult<BookingResponse>> CancelBooking(Guid id)
     {
-        // Only customers can cancel bookings
-        userContextService.ValidateCustomerAccess();
+        ValidateCustomerAccess();
 
-        var userId = userContextService.GetUserId();
-        var tenantId = userContextService.GetTenantId();
+        var userId = GetUserId();
 
         logger.LogInformation("Cancelling booking {BookingId} for user {UserId}", id, userId);
 
-        var booking = await bookingService.CancelBookingAsync(id, userId, tenantId);
-
+        var booking = await bookingService.CancelBookingAsync(id, userId);
         return Ok(booking);
     }
 }

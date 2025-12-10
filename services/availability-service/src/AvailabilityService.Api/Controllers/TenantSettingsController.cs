@@ -1,3 +1,4 @@
+using AvailabilityService.Api.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AvailabilityService.Api.Requests.TenantSettings;
@@ -13,7 +14,7 @@ public class TenantSettingsController(
     ILogger<TenantSettingsController> logger,
     ITenantSettingsService tenantSettingsService,
     IUserContextService userContextService)
-    : BaseApiController
+    : BaseApiController(userContextService)
 {
     /// <summary>
     /// Get buffer settings for the provider's tenant
@@ -29,15 +30,13 @@ public class TenantSettingsController(
     {
         try
         {
-            // Only providers can access their tenant settings
-            userContextService.ValidateProviderAccess();
+            ValidateProviderAccess();
 
-            // Get tenant ID from JWT token
-            var tenantId = userContextService.GetTenantId();
+            var tenantId = GetTenantId() ?? throw new AuthorizationException("TenantSettings", "write", "Providers must have a tenant ID.");
 
             logger.LogInformation("Getting buffer settings for tenant: {TenantId}", tenantId);
 
-            var (bufferBefore, bufferAfter) = await tenantSettingsService.GetBufferSettingsAsync(tenantId);
+            (int bufferBefore, int bufferAfter) = await tenantSettingsService.GetBufferSettingsAsync(tenantId);
 
             var response = new BufferSettingsResponse
             {
@@ -50,7 +49,7 @@ public class TenantSettingsController(
         catch (KeyNotFoundException ex)
         {
             logger.LogError(ex, "Tenant not found");
-            return NotFound(new { Message = ex.Message });
+            return NotFound(new { ex.Message });
         }
     }
 
@@ -71,11 +70,9 @@ public class TenantSettingsController(
     {
         try
         {
-            // Only providers can update their tenant settings
-            userContextService.ValidateProviderAccess();
+            ValidateProviderAccess();
 
-            // Get tenant ID from JWT token
-            var tenantId = userContextService.GetTenantId();
+            var tenantId = GetTenantId() ?? throw new AuthorizationException("TenantSettings", "write", "Providers must have a tenant ID.");
 
             logger.LogInformation("Updating buffer settings for tenant: {TenantId}, Before: {Before}, After: {After}",
                 tenantId, request.BufferBeforeMinutes, request.BufferAfterMinutes);
@@ -96,15 +93,16 @@ public class TenantSettingsController(
         catch (KeyNotFoundException ex)
         {
             logger.LogError(ex, "Tenant not found");
-            return NotFound(new { Message = ex.Message });
+            return NotFound(new { ex.Message });
         }
         catch (ArgumentException ex)
         {
             logger.LogError(ex, "Invalid buffer settings: {Message}", ex.Message);
-            return BadRequest(new { Message = ex.Message });
+            return BadRequest(new { ex.Message });
         }
     }
-      /// <summary>
+    
+    /// <summary>
     /// Reset buffer settings to default values (0 minutes)
     /// </summary>
     /// <remarks>
@@ -118,11 +116,9 @@ public class TenantSettingsController(
     {
         try
         {
-            // Only providers can reset their buffer settings
-            userContextService.ValidateProviderAccess();
+            ValidateProviderAccess();
 
-            // Get tenant ID from JWT token
-            var tenantId = userContextService.GetTenantId();
+            var tenantId = GetTenantId() ?? throw new AuthorizationException("TenantSettings", "write", "Providers must have a tenant ID.");
 
             logger.LogInformation("Resetting buffer settings for tenant: {TenantId}", tenantId);
 
@@ -133,7 +129,7 @@ public class TenantSettingsController(
         catch (KeyNotFoundException ex)
         {
             logger.LogError(ex, "Tenant not found");
-            return NotFound(new { Message = ex.Message });
+            return NotFound(new { ex.Message });
         }
     }
 }

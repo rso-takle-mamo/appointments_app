@@ -96,11 +96,12 @@ services:
     container_name: appointments-availability-service
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8000
+      - ASPNETCORE_URLS=http://+:8000;http://+:5001
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${AVAILABILITY_DB_NAME};Username=${AVAILABILITY_DB_USERNAME};Password=${AVAILABILITY_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     ports:
       - "8003:8000"
+      - "5001:5001"  # gRPC port
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,6 +134,7 @@ services:
       - ASPNETCORE_URLS=http://+:8000
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${BOOKING_DB_NAME};Username=${BOOKING_DB_USERNAME};Password=${BOOKING_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - AvailabilityServiceGrpc__Url=${AVAILABILITY_SERVICE_GRPC_URL}
     ports:
       - "8004:8000"
     depends_on:
@@ -149,8 +151,8 @@ services:
     container_name: appointments-booking-migrator
     environment:
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${BOOKING_DB_NAME};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-      - DATABASE_USERNAME=${USER_DB_USERNAME}
-      - DATABASE_PASSWORD=${USER_DB_PASSWORD}
+      - DATABASE_USERNAME=${BOOKING_DB_USERNAME}
+      - DATABASE_PASSWORD=${BOOKING_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
     profiles:
       - migration

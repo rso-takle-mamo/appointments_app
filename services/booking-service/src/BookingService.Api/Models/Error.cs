@@ -2,8 +2,8 @@ namespace BookingService.Api.Models;
 
 public class Error
 {
-    public required string Code { get; set; }
-    public required string Message { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string? Message { get; set; }
     public string? ResourceType { get; set; }
     public object? ResourceId { get; set; }
 }

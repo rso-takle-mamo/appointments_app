@@ -4,22 +4,24 @@ using BookingService.Api.Requests;
 using BookingService.Database.Entities;
 using BookingService.Database.Repositories.Interfaces;
 using BookingService.Api.Exceptions;
+using BookingService.Api.Services.Grpc;
+using System.Linq;
 
 namespace BookingService.Api.Services;
 
 public class BookingService(
     IBookingRepository bookingRepository,
-    IServiceRepository serviceRepository) : IBookingService
+    IServiceRepository serviceRepository,
+    IAvailabilityGrpcClient availabilityGrpcClient,
+    ILogger<BookingService> logger): IBookingService
 {
     public async Task<BookingResponse> CreateBookingAsync(CreateBookingRequest request, Guid userId, Guid tenantId)
     {
-        // Validate that the start time is in the future
         if (request.StartDateTime <= DateTime.UtcNow)
         {
             throw new ValidationException("Booking start time must be in the future");
         }
 
-        // Get the service to validate it exists and belongs to the tenant
         var service = await serviceRepository.GetByIdAsync(request.ServiceId);
         if (service == null)
         {
@@ -31,13 +33,42 @@ public class BookingService(
             throw new AuthorizationException("Service", "access", "You can only book services from your own tenant");
         }
 
-        // Calculate end time based on service duration
+        if (!service.IsActive)
+        {
+            throw new ConflictException("SERVICE_INACTIVE", "The selected service is not currently available for booking");
+        }
+
         var endDateTime = request.StartDateTime.AddMinutes(service.DurationMinutes);
 
-        // TODO: Call availability service to check if time slot is free
-        // gRPC call to availability service here
+        var availabilityRequest = new TimeSlotRequest
+        {
+            TenantId = tenantId.ToString(),
+            ServiceId = request.ServiceId.ToString(),
+            StartTime = request.StartDateTime,
+            EndTime = endDateTime
+        };
 
-        // Create the booking
+        logger.LogInformation("Checking availability for booking - Tenant: {TenantId}, Service: {ServiceId}, Start: {StartTime}, End: {EndTime}",
+            tenantId, request.ServiceId, request.StartDateTime, endDateTime);
+
+        // Synchronous grpc call - blocks until availability service responds
+        var availabilityResponse = await availabilityGrpcClient.CheckAvailabilityAsync(availabilityRequest);
+
+        if (!availabilityResponse.IsAvailable)
+        {
+            var conflictDescriptions = availabilityResponse.Conflicts
+                .Select(c => $"{c.Type}: {c.OverlapStart:HH:mm} - {c.OverlapEnd:HH:mm}");
+
+            logger.LogWarning("Time slot not available for booking. Conflicts: {Conflicts}",
+                string.Join(", ", conflictDescriptions));
+
+            var errorMessage = availabilityResponse.Conflicts.Count > 0
+                ? $"The requested time slot is not available due to the following conflicts: {string.Join(", ", conflictDescriptions)}"
+                : "The requested time slot is not available";
+
+            throw new ConflictException("SLOT_UNAVAILABLE", errorMessage);
+        }
+
         var booking = new Booking
         {
             TenantId = tenantId,
@@ -62,10 +93,8 @@ public class BookingService(
             return null;
         }
 
-        // Authorization check
         if (userRole.Equals("Customer", StringComparison.OrdinalIgnoreCase))
         {
-            // Customers can only see their own bookings
             if (booking.OwnerId != userId)
             {
                 throw new AuthorizationException("Booking", "read", "You can only view your own bookings");
@@ -73,7 +102,6 @@ public class BookingService(
         }
         else
         {
-            // Providers can only see bookings from their tenant
             if (booking.TenantId != tenantId)
             {
                 throw new AuthorizationException("Booking", "read", "You can only view bookings from your tenant");
@@ -90,31 +118,22 @@ public class BookingService(
         string userRole)
     {
         List<Booking> bookings;
-        int totalCount;
 
         if (userRole.Equals("Customer", StringComparison.OrdinalIgnoreCase))
         {
-            // Customers can only see their own bookings
             bookings = await bookingRepository.GetByOwnerIdAsync(userId);
-            totalCount = bookings.Count;
-
-            // Apply filters
-            bookings = ApplyFilters(bookings, request);
         }
         else
         {
-            // Providers can see all bookings from their tenant
             bookings = await bookingRepository.GetByTenantIdAsync(tenantId);
-            totalCount = bookings.Count;
-
-            // Apply filters
-            bookings = ApplyFilters(bookings, request);
         }
 
-        // Sort by StartDateTime ascending
+        bookings = ApplyFilters(bookings, request);
+
+        var totalCount = bookings.Count;
+
         bookings = bookings.OrderBy(b => b.StartDateTime).ToList();
 
-        // Apply pagination
         var paginatedBookings = bookings
             .Skip(request.Offset)
             .Take(request.Limit)
@@ -131,7 +150,7 @@ public class BookingService(
         return (response, totalCount);
     }
 
-    public async Task<BookingResponse> CancelBookingAsync(Guid id, Guid userId, Guid tenantId)
+    public async Task<BookingResponse> CancelBookingAsync(Guid id, Guid userId)
     {
         var booking = await bookingRepository.GetByIdAsync(id);
         if (booking == null)
@@ -139,13 +158,11 @@ public class BookingService(
             throw new NotFoundException("Booking", id);
         }
 
-        // Authorization check - ensure booking belongs to the user
         if (booking.OwnerId != userId)
         {
             throw new AuthorizationException("Booking", "cancel", "You can only cancel your own bookings");
         }
 
-        // Validate booking can be cancelled
         if (booking.BookingStatus == BookingStatus.Cancelled)
         {
             throw new ConflictException("Status", "Booking is already cancelled");
@@ -156,7 +173,6 @@ public class BookingService(
             throw new ConflictException("Status", "Cannot cancel a completed booking");
         }
 
-        // Update status
         booking.BookingStatus = BookingStatus.Cancelled;
         var updatedBooking = await bookingRepository.UpdateAsync(booking);
 

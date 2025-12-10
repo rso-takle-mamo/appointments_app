@@ -1,5 +1,6 @@
 using AvailabilityService.Api.Responses;
 using AvailabilityService.Api.Services.Interfaces;
+using AvailabilityService.Api.Models.Internal;
 using AvailabilityService.Database.Entities;
 using AvailabilityService.Database.Repositories.Interfaces;
 
@@ -9,7 +10,8 @@ public class AvailabilityService(
     IWorkingHoursRepository workingHoursRepository,
     ITimeBlockRepository timeBlockRepository,
     ITenantRepository tenantRepository,
-    IBookingRepository bookingRepository)
+    IBookingRepository bookingRepository,
+    ILogger<AvailabilityService> logger)
     : IAvailabilityService
 {
     public async Task<AvailableTimeRangeResponse> GetAvailableRangesAsync(Guid tenantId, DateTime startDate, DateTime endDate)
@@ -20,62 +22,122 @@ public class AvailabilityService(
             throw new KeyNotFoundException($"Tenant not found: {tenantId}");
         }
 
-        // Get all data for the date range
-        var workingHours = await workingHoursRepository.GetWorkingHoursByTenantAndDateRangeAsync(tenantId, startDate, endDate);
-        var timeBlocks = await timeBlockRepository.GetTimeBlocksByTenantAndDateRangeAsync(tenantId, startDate, endDate);
-        var bookings = await bookingRepository.GetBookingsByTenantAndDateRangeAsync(tenantId, startDate, endDate);
+        var (workingHours, timeBlocks, bookings) = await GetAllAvailabilityDataAsync(tenantId, startDate, endDate);
+
+        var workingHoursList = workingHours.ToList();
+        var timeBlocksList = timeBlocks.ToList();
+        var bookingsList = bookings.ToList();
 
         var response = new AvailableTimeRangeResponse();
 
-        // Process each day in the range
         for (var date = startDate.Date; date <= endDate.Date; date = date.AddDays(1))
         {
             var dayOfWeek = date.DayOfWeek;
 
-            // Get working hours for this day
-            var dayWorkingHours = workingHours.FirstOrDefault(wh => wh.Day == dayOfWeek);
+            var dayWorkingHours = workingHoursList.FirstOrDefault(wh => wh.Day == dayOfWeek);
 
-            // Skip if no working hours or if it's a day off (StartTime == EndTime)
-            if (dayWorkingHours == null || IsDayFree(dayWorkingHours))
+            if (dayWorkingHours == null || dayWorkingHours.StartTime == dayWorkingHours.EndTime)
             {
                 continue;
             }
 
-            // Create working hours range for this specific day (everything in UTC)
             var workingStart = new DateTime(date.Year, date.Month, date.Day,
                 dayWorkingHours.StartTime.Hour, dayWorkingHours.StartTime.Minute, 0, DateTimeKind.Utc);
             var workingEnd = new DateTime(date.Year, date.Month, date.Day,
                 dayWorkingHours.EndTime.Hour, dayWorkingHours.EndTime.Minute, 0, DateTimeKind.Utc);
 
-            // Collect time blocks and bookings separately
-            var timeBlockPeriods = CollectTimeBlockPeriods(timeBlocks, date);
-            var bookingPeriods = CollectBookingPeriods(bookings, date);
-
-            // Apply buffer times to bookings only
-            var bookingPeriodsWithBuffers = ApplyBufferTimesToBookings(bookingPeriods, tenant.BufferBeforeMinutes, tenant.BufferAfterMinutes);
-
-            // Combine time blocks and buffered bookings
-            var busyPeriods = timeBlockPeriods.Concat(bookingPeriodsWithBuffers).ToList();
-
-            // Clip busy periods to working hours
-            var clippedBusyPeriods = new List<(DateTime Start, DateTime End)>();
-            foreach (var bp in busyPeriods)
+            // Collect time blocks for this day
+            var timeBlockPeriods = new List<(DateTime Start, DateTime End)>();
+            foreach (var timeBlock in timeBlocksList)
             {
-                var clippedStart = bp.Start > workingStart ? bp.Start : workingStart;
-                var clippedEnd = bp.End < workingEnd ? bp.End : workingEnd;
-                if (clippedStart < clippedEnd)
+                if (timeBlock.StartDateTime.Date == date.Date)
                 {
-                    clippedBusyPeriods.Add((clippedStart, clippedEnd));
+                    timeBlockPeriods.Add((timeBlock.StartDateTime, timeBlock.EndDateTime));
                 }
             }
 
-            // Subtract busy periods from working hours
-            var availableRanges = SubtractBusyPeriods(workingStart, workingEnd, clippedBusyPeriods);
+            // Collect bookings for this day
+            var bookingPeriods = new List<(DateTime Start, DateTime End)>();
+            foreach (var booking in bookingsList)
+            {
+                if ((booking.BookingStatus == BookingStatus.Confirmed || booking.BookingStatus == BookingStatus.Pending)
+                    && booking.StartDateTime.Date == date.Date)
+                {
+                    bookingPeriods.Add((booking.StartDateTime, booking.EndDateTime));
+                }
+            }
 
-            // Merge adjacent ranges
-            var mergedRanges = MergeRanges(availableRanges);
+            // Apply buffer times to bookings
+            var bookingPeriodsWithBuffers = new List<(DateTime Start, DateTime End)>();
+            foreach (var bookingPeriod in bookingPeriods)
+            {
+                bookingPeriodsWithBuffers.Add((
+                    bookingPeriod.Start.AddMinutes(-tenant.BufferBeforeMinutes),
+                    bookingPeriod.End.AddMinutes(tenant.BufferAfterMinutes)
+                ));
+            }
 
-            // Add to response
+            var busyPeriods = timeBlockPeriods.Concat(bookingPeriodsWithBuffers).ToList();
+
+            var availableRanges = new List<(DateTime Start, DateTime End)> { (workingStart, workingEnd) };
+            foreach (var (beforeEnd, afterStart) in busyPeriods)
+            {
+                var newAvailableRanges = new List<(DateTime Start, DateTime End)>();
+                foreach (var availableRange in availableRanges)
+                {
+                    if (!(availableRange.Start < afterStart && availableRange.End > beforeEnd))
+                    {
+                        newAvailableRanges.Add(availableRange);
+                        continue;
+                    }
+
+                    if (availableRange.Start < beforeEnd)
+                    {
+                        if (availableRange.Start < beforeEnd)
+                        {
+                            newAvailableRanges.Add((availableRange.Start, beforeEnd));
+                        }
+                    }
+
+                    if (availableRange.End <= afterStart) continue;
+
+                    if (afterStart < availableRange.End)
+                    {
+                        newAvailableRanges.Add((afterStart, availableRange.End));
+                    }
+                }
+                availableRanges = newAvailableRanges;
+            }
+
+            // Merge overlapping ranges
+            var mergedRanges = availableRanges;
+            if (mergedRanges.Count != 0)
+            {
+                var sortedRanges = mergedRanges.OrderBy(r => r.Start).ToList();
+                var merged = new List<(DateTime Start, DateTime End)>();
+                var current = sortedRanges[0];
+
+                for (var i = 1; i < sortedRanges.Count; i++)
+                {
+                    var next = sortedRanges[i];
+                    
+                    if ((current.Start < next.End && current.End > next.Start) || current.End == next.Start)
+                    {
+                        current = (
+                            current.Start < next.Start ? current.Start : next.Start,
+                            current.End > next.End ? current.End : next.End
+                        );
+                    }
+                    else
+                    {
+                        merged.Add(current);
+                        current = next;
+                    }
+                }
+                merged.Add(current);
+                mergedRanges = merged;
+            }
+
             foreach (var range in mergedRanges)
             {
                 response.AvailableRanges.Add(new AvailableTimeRange
@@ -86,146 +148,171 @@ public class AvailabilityService(
             }
         }
 
-        // Sort all ranges by start time
         response.AvailableRanges = response.AvailableRanges.OrderBy(r => r.Start).ToList();
 
         return response;
     }
 
-    private static bool IsDayFree(WorkingHours workingHours)
+    public async Task<AvailabilityCheckResult> IsTimeSlotAvailableAsync(Guid tenantId, Guid serviceId, DateTime startTime, DateTime endTime)
     {
-        // A day is considered free if start time equals end time
-        return workingHours.StartTime == workingHours.EndTime;
+        var tenant = await tenantRepository.GetTenantByIdAsync(tenantId);
+        if (tenant == null)
+        {
+            return new AvailabilityCheckResult
+            {
+                IsAvailable = false,
+                Conflicts =
+                [
+                    new ConflictInfo
+                    {
+                        Type = ConflictType.WorkingHours,
+                        OverlapStart = startTime,
+                        OverlapEnd = endTime
+                    }
+                ]
+            };
+        }
+
+        var conflicts = await DetectAllConflictsAsync(
+            tenantId,
+            startTime,
+            endTime,
+            tenant.BufferBeforeMinutes,
+            tenant.BufferAfterMinutes);
+
+        return new AvailabilityCheckResult
+        {
+            IsAvailable = conflicts.Count == 0,
+            Conflicts = conflicts
+        };
     }
 
-    private static List<(DateTime Start, DateTime End)> CollectTimeBlockPeriods(IEnumerable<TimeBlock> timeBlocks, DateTime date)
+    private static (DateTime overlapStart, DateTime overlapEnd)? CalculateOverlap(
+        DateTime requestedStart,
+        DateTime requestedEnd,
+        DateTime conflictStart,
+        DateTime conflictEnd)
     {
-        var timeBlockPeriods = new List<(DateTime, DateTime)>();
+        if (requestedStart > conflictEnd || requestedEnd < conflictStart)
+        {
+            return null;
+        }
 
+        var overlapStart = requestedStart > conflictStart ? requestedStart : conflictStart;
+        var overlapEnd = requestedEnd < conflictEnd ? requestedEnd : conflictEnd;
+
+        if (overlapStart < overlapEnd)
+        {
+            return (overlapStart, overlapEnd);
+        }
+
+        return null;
+    }
+    
+
+    private async Task<(IEnumerable<WorkingHours> WorkingHours, IEnumerable<TimeBlock> TimeBlocks, IEnumerable<Booking> Bookings)>
+        GetAllAvailabilityDataAsync(Guid tenantId, DateTime startDate, DateTime endDate)
+    {
+        var workingHours = await workingHoursRepository.GetWorkingHoursByTenantAsync(tenantId);
+        var timeBlocks = await timeBlockRepository.GetTimeBlocksByTenantAndDateRangeAsync(tenantId, startDate, endDate);
+        var bookings = await bookingRepository.GetBookingsByTenantAndDateRangeAsync(tenantId, startDate, endDate);
+
+        return (workingHours, timeBlocks, bookings);
+    }
+    
+    
+    public async Task<List<ConflictInfo>> DetectAllConflictsAsync(
+        Guid tenantId,
+        DateTime startTime,
+        DateTime endTime,
+        int bufferBeforeMinutes,
+        int bufferAfterMinutes)
+    {
+        var fullRangeStart = startTime.AddMinutes(-bufferBeforeMinutes);
+        var fullRangeEnd = endTime.AddMinutes(bufferAfterMinutes);
+        var conflicts = new List<ConflictInfo>();
+
+        var workingHours = await workingHoursRepository.GetWorkingHoursByTenantAsync(tenantId);
+        var workingHoursForDays = workingHours.Where(wh => wh.Day == startTime.DayOfWeek).ToList();
+
+        if (workingHoursForDays.Count == 0)
+        {
+            conflicts.Add(new ConflictInfo
+            {
+                Type = ConflictType.WorkingHours,
+                OverlapStart = startTime,
+                OverlapEnd = endTime
+            });
+        }
+        else
+        {
+            foreach (var dayWorkingHours in workingHoursForDays)
+            {
+                var dayWorkingStart = new DateTime(startTime.Year, startTime.Month, startTime.Day,
+                    dayWorkingHours.StartTime.Hour, dayWorkingHours.StartTime.Minute, 0, DateTimeKind.Utc);
+                var dayWorkingEnd = new DateTime(startTime.Year, startTime.Month, startTime.Day,
+                    dayWorkingHours.EndTime.Hour, dayWorkingHours.EndTime.Minute, 0, DateTimeKind.Utc);
+
+                if (startTime < dayWorkingStart)
+                {
+                    conflicts.Add(new ConflictInfo
+                    {
+                        Type = ConflictType.WorkingHours,
+                        OverlapStart = startTime,
+                        OverlapEnd = dayWorkingStart
+                    });
+                }
+
+                if (endTime > dayWorkingEnd)
+                {
+                    conflicts.Add(new ConflictInfo
+                    {
+                        Type = ConflictType.WorkingHours,
+                        OverlapStart = dayWorkingEnd,
+                        OverlapEnd = endTime
+                    });
+                }
+            }
+        }
+
+        // Check time blocks
+        var timeBlocks = await timeBlockRepository.GetTimeBlocksByTenantAndDateRangeAsync(tenantId, fullRangeStart, fullRangeEnd);
         foreach (var timeBlock in timeBlocks)
         {
-            // Only include time blocks that fall on this date (all in UTC)
-            if (timeBlock.StartDateTime.Date == date.Date)
+            var overlap = CalculateOverlap(fullRangeStart, fullRangeEnd, timeBlock.StartDateTime, timeBlock.EndDateTime);
+            if (overlap.HasValue)
             {
-                timeBlockPeriods.Add((timeBlock.StartDateTime, timeBlock.EndDateTime));
+                conflicts.Add(new ConflictInfo
+                {
+                    Type = ConflictType.TimeBlock,
+                    OverlapStart = overlap.Value.overlapStart,
+                    OverlapEnd = overlap.Value.overlapEnd
+                });
             }
         }
 
-        return timeBlockPeriods.OrderBy(bp => bp.Item1).ToList();
-    }
-
-    private static List<(DateTime Start, DateTime End)> CollectBookingPeriods(IEnumerable<Booking> bookings, DateTime date)
-    {
-        var bookingPeriods = new List<(DateTime, DateTime)>();
-
+        // Check existing bookings with their buffers
+        var bookings = await bookingRepository.GetBookingsByTenantAndDateRangeAsync(tenantId, fullRangeStart, fullRangeEnd);
         foreach (var booking in bookings)
         {
-            // Only include bookings that are Confirmed or Pending
-            if (booking.BookingStatus == BookingStatus.Confirmed || booking.BookingStatus == BookingStatus.Pending)
+            if (booking.BookingStatus == BookingStatus.Cancelled)
+                continue;
+
+            var reservedStart = booking.StartDateTime.AddMinutes(-bufferBeforeMinutes);
+            var reservedEnd = booking.EndDateTime.AddMinutes(bufferAfterMinutes);
+
+            var overlap = CalculateOverlap(fullRangeStart, fullRangeEnd, reservedStart, reservedEnd);
+            if (overlap.HasValue)
             {
-                // Check if the booking falls on this date (all in UTC)
-                if (booking.StartDateTime.Date == date.Date)
+                conflicts.Add(new ConflictInfo
                 {
-                    bookingPeriods.Add((booking.StartDateTime, booking.EndDateTime));
-                }
+                    Type = ConflictType.BufferTime,
+                    OverlapStart = overlap.Value.overlapStart,
+                    OverlapEnd = overlap.Value.overlapEnd
+                });
             }
         }
 
-        return bookingPeriods.OrderBy(bp => bp.Item1).ToList();
-    }
-
-    private static List<(DateTime Start, DateTime End)> ApplyBufferTimesToBookings(List<(DateTime Start, DateTime End)> busyPeriods, int bufferBeforeMinutes, int bufferAfterMinutes)
-    {
-        var result = new List<(DateTime, DateTime)>();
-
-        foreach (var busyPeriod in busyPeriods)
-        {
-            // Expand the busy period with buffer times
-            var expandedPeriod = (
-                busyPeriod.Start.AddMinutes(-bufferBeforeMinutes),
-                busyPeriod.End.AddMinutes(bufferAfterMinutes)
-            );
-            result.Add(expandedPeriod);
-        }
-
-        return result;
-    }
-
-    private static List<(DateTime Start, DateTime End)> SubtractBusyPeriods(DateTime workingStart, DateTime workingEnd, List<(DateTime Start, DateTime End)> busyPeriods)
-    {
-        var availableRanges = new List<(DateTime Start, DateTime End)> { (workingStart, workingEnd) };
-
-        foreach (var busyPeriod in busyPeriods)
-        {
-            var newAvailableRanges = new List<(DateTime Start, DateTime End)>();
-
-            foreach (var availableRange in availableRanges)
-            {
-                // Check if they overlap
-                if (!(availableRange.Start < busyPeriod.End && availableRange.End > busyPeriod.Start))
-                {
-                    // No overlap, keep the range as is
-                    newAvailableRanges.Add(availableRange);
-                    continue;
-                }
-
-                // Add the part before the overlapping section, if any
-                if (availableRange.Start < busyPeriod.Start)
-                {
-                    var beforeEnd = busyPeriod.Start;
-                    if (availableRange.Start < beforeEnd)
-                    {
-                        newAvailableRanges.Add((availableRange.Start, beforeEnd));
-                    }
-                }
-
-                // Add the part after the overlapping section, if any
-                if (availableRange.End > busyPeriod.End)
-                {
-                    var afterStart = busyPeriod.End;
-                    if (afterStart < availableRange.End)
-                    {
-                        newAvailableRanges.Add((afterStart, availableRange.End));
-                    }
-                }
-            }
-
-            availableRanges = newAvailableRanges;
-        }
-
-        return availableRanges;
-    }
-
-    private static List<(DateTime Start, DateTime End)> MergeRanges(List<(DateTime Start, DateTime End)> ranges)
-    {
-        if (ranges == null || ranges.Count == 0)
-            return new List<(DateTime Start, DateTime End)>();
-
-        // Sort ranges by start time
-        var sortedRanges = ranges.OrderBy(r => r.Start).ToList();
-        var merged = new List<(DateTime Start, DateTime End)>();
-        var current = sortedRanges[0];
-
-        for (int i = 1; i < sortedRanges.Count; i++)
-        {
-            var next = sortedRanges[i];
-
-            // If ranges overlap or are adjacent, merge them
-            if ((current.Start < next.End && current.End > next.Start) || current.End == next.Start)
-            {
-                current = (
-                    current.Start < next.Start ? current.Start : next.Start,
-                    current.End > next.End ? current.End : next.End
-                );
-            }
-            else
-            {
-                merged.Add(current);
-                current = next;
-            }
-        }
-
-        merged.Add(current);
-        return merged;
+        return conflicts;
     }
 }

@@ -17,12 +17,7 @@ public class TenantSettingsService(
     public async Task<(int BufferBeforeMinutes, int BufferAfterMinutes)> GetBufferSettingsAsync(Guid tenantId)
     {
         var tenant = await tenantRepository.GetTenantByIdAsync(tenantId);
-        if (tenant == null)
-        {
-            throw new KeyNotFoundException($"Tenant not found: {tenantId}");
-        }
-
-        return (tenant.BufferBeforeMinutes, tenant.BufferAfterMinutes);
+        return tenant == null ? throw new KeyNotFoundException($"Tenant not found: {tenantId}") : (tenant.BufferBeforeMinutes, tenant.BufferAfterMinutes);
     }
 
     public async Task<(int BufferBeforeMinutes, int BufferAfterMinutes)> UpdateBufferSettingsAsync(
@@ -30,13 +25,15 @@ public class TenantSettingsService(
         int? bufferBeforeMinutes,
         int? bufferAfterMinutes)
     {
-        // Validate inputs
         if (bufferBeforeMinutes.HasValue)
         {
-            if (bufferBeforeMinutes.Value < 0)
-                throw new ArgumentException("BufferBeforeMinutes cannot be negative");
-            if (bufferBeforeMinutes.Value > 480)
-                throw new ArgumentException("BufferBeforeMinutes cannot exceed 480 minutes (8 hours)");
+            switch (bufferBeforeMinutes.Value)
+            {
+                case < 0:
+                    throw new ArgumentException("BufferBeforeMinutes cannot be negative");
+                case > 480:
+                    throw new ArgumentException("BufferBeforeMinutes cannot exceed 480 minutes (8 hours)");
+            }
         }
 
         if (bufferAfterMinutes.HasValue)
@@ -47,20 +44,17 @@ public class TenantSettingsService(
                 throw new ArgumentException("BufferAfterMinutes cannot exceed 480 minutes (8 hours)");
         }
 
-        // At least one value must be provided for PATCH
         if (!bufferBeforeMinutes.HasValue && !bufferAfterMinutes.HasValue)
         {
             throw new ArgumentException("At least one buffer setting must be provided");
         }
 
-        // Get the tenant entity
         var tenant = await context.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId);
         if (tenant == null)
         {
             throw new KeyNotFoundException($"Tenant not found: {tenantId}");
         }
 
-        // Update only the provided values
         if (bufferBeforeMinutes.HasValue)
         {
             tenant.BufferBeforeMinutes = bufferBeforeMinutes.Value;
@@ -106,14 +100,12 @@ public class TenantSettingsService(
 
     public async Task<TenantSettingsResponse> CreateTenantSettingsAsync(Guid tenantId, CreateTenantSettingsRequest request)
     {
-        // Check if tenant already exists
         var existingTenant = await tenantRepository.GetTenantByIdAsync(tenantId);
         if (existingTenant != null)
         {
             throw new InvalidOperationException($"Tenant settings already exist for tenant: {tenantId}");
         }
 
-        // Validate time zone if provided
         if (!string.IsNullOrEmpty(request.TimeZone))
         {
             try
@@ -168,7 +160,6 @@ public class TenantSettingsService(
             throw new KeyNotFoundException($"Tenant not found: {tenantId}");
         }
 
-        // Validate buffer times
         if (request.BufferBeforeMinutes < 0)
             throw new ArgumentException("BufferBeforeMinutes cannot be negative");
         if (request.BufferAfterMinutes < 0)
@@ -178,7 +169,6 @@ public class TenantSettingsService(
         if (request.BufferAfterMinutes > 480)
             throw new ArgumentException("BufferAfterMinutes cannot exceed 480 minutes (8 hours)");
 
-        // Validate time zone if provided
         if (!string.IsNullOrEmpty(request.TimeZone))
         {
             try
@@ -228,7 +218,6 @@ public class TenantSettingsService(
             throw new KeyNotFoundException($"Tenant not found: {tenantId}");
         }
 
-        // At least one property must be provided for PATCH
         if (request.BusinessName == null &&
             request.Email == null &&
             request.Phone == null &&
@@ -240,7 +229,6 @@ public class TenantSettingsService(
             throw new ArgumentException("At least one property must be provided for patch");
         }
 
-        // Validate buffer times if provided
         if (request.BufferBeforeMinutes.HasValue)
         {
             if (request.BufferBeforeMinutes.Value < 0)
@@ -257,7 +245,6 @@ public class TenantSettingsService(
                 throw new ArgumentException("BufferAfterMinutes cannot exceed 480 minutes (8 hours)");
         }
 
-        // Validate time zone if provided
         if (!string.IsNullOrEmpty(request.TimeZone))
         {
             try
@@ -270,7 +257,6 @@ public class TenantSettingsService(
             }
         }
 
-        // Update only the provided values
         if (request.BusinessName != null)
             tenant.BusinessName = request.BusinessName;
         if (request.Email != null)
@@ -315,7 +301,6 @@ public class TenantSettingsService(
             throw new KeyNotFoundException($"Tenant not found: {tenantId}");
         }
 
-        // Reset buffer settings to default values (0)
         tenant.BufferBeforeMinutes = 0;
         tenant.BufferAfterMinutes = 0;
 

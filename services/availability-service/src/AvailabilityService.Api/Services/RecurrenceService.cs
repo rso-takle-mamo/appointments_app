@@ -26,21 +26,18 @@ public class RecurrenceService(ITimeBlockRepository timeBlockRepository, ILogger
         logger.LogInformation("Generating recurring blocks - BaseStart: {BaseStart}, EndDate: {EndDate}, Duration: {Duration}",
             baseStart, endDate, duration);
 
-        // Adjust maxOccurrences to account for the master block (already created)
-        var adjustedMaxOccurrences = pattern.MaxOccurrences.HasValue
-            ? pattern.MaxOccurrences.Value - 1  // Subtract 1 for the master block
-            : (int?)null;
+        var adjustedMaxOccurrences = pattern.MaxOccurrences - 1;
 
         if (pattern.HasDaysOfWeek)
         {
             // Weekly: Generate occurrences across all specified days
             var allDates = new List<DateTime>();
 
-            // First, handle days in the same week that come after the master timeblock
             var masterDayOfWeek = baseStart.DayOfWeek;
             foreach (var day in pattern.DaysOfWeek)
             {
-                var targetDay = (DayOfWeek)day;
+                var targetDay = day;
+                
                 // Only process days that come after the master timeblock's day in the same week
                 if (targetDay > masterDayOfWeek)
                 {
@@ -95,7 +92,6 @@ public class RecurrenceService(ITimeBlockRepository timeBlockRepository, ILogger
                 }
             }
 
-            // Sort and create timeblocks
             foreach (var date in allDates.OrderBy(d => d))
             {
                 var timeBlock = CreateTimeBlockInstance(date, date + duration, masterId, tenantId, type, reason);
@@ -149,7 +145,6 @@ public class RecurrenceService(ITimeBlockRepository timeBlockRepository, ILogger
                 currentStart = nextStart;
             }
 
-            // Sort and create timeblocks
             foreach (var date in allDates.OrderBy(d => d))
             {
                 var timeBlock = CreateTimeBlockInstance(date, date + duration, masterId, tenantId, type, reason);
@@ -170,19 +165,13 @@ public class RecurrenceService(ITimeBlockRepository timeBlockRepository, ILogger
             }
         }
 
-        if (timeBlocks.Any())
+        if (timeBlocks.Count != 0)
         {
             await timeBlockRepository.CreateMultipleTimeBlocksAsync(timeBlocks);
             logger.LogInformation("Generated {Count} recurring time blocks for master {MasterId}", timeBlocks.Count, masterId);
         }
 
         return timeBlocks;
-    }
-
-    private DateTime GetNextOccurrenceOfWeekday(DateTime from, DayOfWeek targetDay)
-    {
-        int daysUntilTarget = ((int)targetDay - (int)from.DayOfWeek + 7) % 7;
-        return DateTime.SpecifyKind(from.AddDays(daysUntilTarget), DateTimeKind.Utc);
     }
 
     private DateTime CalculateMonthlyOccurrence(DateTime baseDate, int day)
@@ -222,10 +211,7 @@ public class RecurrenceService(ITimeBlockRepository timeBlockRepository, ILogger
         TimeBlockType type,
         string? reason = null)
     {
-        // Delete existing recurring blocks (except master)
         await DeleteRecurringTimeBlocksAsync(masterId, tenantId);
-
-        // Generate new recurring blocks
         await GenerateRecurringTimeBlocksAsync(newPattern, baseStart, baseEnd, masterId, tenantId, type, reason);
     }
 

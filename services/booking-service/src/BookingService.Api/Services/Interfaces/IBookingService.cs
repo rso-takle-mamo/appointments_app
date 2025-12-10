@@ -12,5 +12,5 @@ public interface IBookingService
         Guid userId,
         Guid tenantId,
         string userRole);
-    Task<BookingResponse> CancelBookingAsync(Guid id, Guid userId, Guid tenantId);
+    Task<BookingResponse> CancelBookingAsync(Guid id, Guid userId);
 }

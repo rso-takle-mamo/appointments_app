@@ -40,15 +40,14 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
     {
         return exception switch
         {
-            // Custom domain exceptions
             ValidationException ex => ErrorResponses.CreateValidation(
-                $"Validation failed with {ex.ValidationErrors?.Count ?? 0} error(s).",
-                ex.ValidationErrors ?? new List<ValidationError>()
+                ex.Message,
+                ex.ValidationErrors
             ),
             NotFoundException ex => ErrorResponses.Create(
                 ex.ErrorCode,
                 ex.Message,
-                ex.ResourceType ?? "Resource",
+                ex.ResourceType,
                 ex.ResourceId
             ),
             ConflictException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
@@ -56,7 +55,6 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
             AuthorizationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
             DatabaseOperationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
 
-            // Database exceptions
             DbUpdateException ex => ErrorResponses.Create(
                 "DATABASE_ERROR",
                 ex.InnerException?.Message ?? ex.Message
@@ -69,15 +67,12 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
     private static int GetStatusCode(Exception exception) =>
         exception switch
         {
-            // Custom domain exceptions
             ValidationException => StatusCodes.Status400BadRequest,
             NotFoundException => StatusCodes.Status404NotFound,
             ConflictException => StatusCodes.Status409Conflict,
             AuthenticationException => StatusCodes.Status401Unauthorized,
             AuthorizationException => StatusCodes.Status403Forbidden,
             DatabaseOperationException => StatusCodes.Status500InternalServerError,
-
-            // Database exceptions
             DbUpdateException => StatusCodes.Status400BadRequest,
 
             _ => StatusCodes.Status500InternalServerError

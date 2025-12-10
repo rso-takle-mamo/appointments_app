@@ -32,6 +32,17 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.Property(e => e.DurationMinutes)
             .IsRequired();
 
+        builder.Property(e => e.IsActive)
+            .IsRequired();
+        
+        builder.Property(e => e.CreatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder.Property(e => e.UpdatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
         // Indexes
         builder.HasIndex(e => e.TenantId);
         builder.HasIndex(e => new { e.TenantId, e.Name });

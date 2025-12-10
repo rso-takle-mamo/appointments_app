@@ -1,51 +1,26 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AvailabilityService.Api.Exceptions;
-using System.Security.Claims;
+using AvailabilityService.Api.Services.Interfaces;
 
 namespace AvailabilityService.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Produces("application/json")]
-public abstract class BaseApiController : ControllerBase
+public abstract class BaseApiController(IUserContextService userContextService) : ControllerBase
 {
-    protected Guid GetUserIdFromToken()
-    {
-        var userIdClaim = User.FindFirst("user_id")?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            throw new AuthenticationException("token", "Invalid user token");
-        }
-        return userId;
-    }
+    protected Guid GetUserId() => userContextService.GetUserId();
 
-    private Guid? GetTenantIdFromToken()
-    {
-        var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
-        if (string.IsNullOrEmpty(tenantIdClaim))
-        {
-            return null;
-        }
-        return Guid.TryParse(tenantIdClaim, out var tenantId) ? tenantId : null;
-    }
+    protected Guid? GetTenantId() => userContextService.GetTenantId();
 
-    protected void ValidateTenantAccess(Guid requestedTenantId)
-    {
-        var userTenantId = GetTenantIdFromToken();
-        if (userTenantId == null)
-        {
-            throw new AuthorizationException(
-                "Tenant",
-                "access",
-                "Users without a tenant cannot access tenant resources");
-        }
-        if (requestedTenantId != userTenantId.Value)
-        {
-            throw new AuthorizationException(
-                "Tenant",
-                "access",
-                "You are not authorized to access this tenant");
-        }
-    }
+    protected bool IsCustomer() => userContextService.IsCustomer();
+
+    protected string GetUserRole() => userContextService.GetRole();
+
+    protected void ValidateCustomerAccess() => userContextService.ValidateCustomerAccess();
+
+    protected void ValidateTenantAccess(Guid tenantId) => userContextService.ValidateTenantAccess(tenantId, "resource");
+
+    protected void ValidateProviderAccess() => userContextService.ValidateProviderAccess();
 }

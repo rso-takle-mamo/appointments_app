@@ -38,14 +38,27 @@ public static class ErrorResponses
         };
     }
 
-    public static ValidationErrorResponse CreateValidation(string message, List<ValidationError> validationErrors)
+    public static ValidationErrorResponse CreateValidation(string message, List<ValidationError>? validationErrors)
     {
+        // If no validation errors provided, create a single error from the message
+        if (validationErrors == null || validationErrors.Count == 0)
+        {
+            validationErrors =
+            [
+                new ValidationError()
+                {
+                    Field = "General",
+                    Message = message
+                }
+            ];
+        }
+
+        // If we have field-specific errors, don't include the message in the error object
         return new ValidationErrorResponse
         {
             Error = new Error
             {
-                Code = "VALIDATION_ERROR",
-                Message = message
+                Code = "VALIDATION_ERROR"
             },
             ValidationErrors = validationErrors
         };

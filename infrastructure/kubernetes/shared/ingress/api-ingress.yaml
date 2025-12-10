@@ -22,3 +22,17 @@ spec:
             name: service-catalog-service
             port:
               number: 8000
+      - path: /api/services
+        pathType: Prefix
+        backend:
+          service:
+            name: availability-service
+            port:
+              number: 8000
+      - path: /api/services
+        pathType: Prefix
+        backend:
+          service:
+            name: booking-service
+            port:
+              number: 8000

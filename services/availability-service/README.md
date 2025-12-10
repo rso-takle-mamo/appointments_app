@@ -514,6 +514,99 @@ Authorization: Bearer <token>
 
 **Response:** Updated buffer settings
 
+## gRPC Service
+
+The Availability Service exposes a gRPC endpoint for time slot availability checking. This is primarily used by the Booking Service to validate booking requests.
+
+### gRPC Service Definition
+
+### gRPC Endpoint
+
+- **URL:** Configured in `appsettings.json` or via environment variable
+- **Default URL:** `http://localhost:5003` (development)
+- **Port:** The gRPC service is mapped to port 5003 by default
+
+### Request Validation
+
+The gRPC service performs the following validations:
+
+1. **Required Fields:**
+   - `tenant_id` must be a valid GUID
+   - `service_id` must be a valid GUID
+   - `start_time` and `end_time` must be provided
+
+2. **Time Validation:**
+   - `start_time` must be before `end_time`
+   - Times are converted to UTC for consistency
+
+3. **Business Logic:**
+   - Checks against working hours for the tenant
+   - Verifies no overlapping time blocks (unavailable periods)
+   - Ensures no existing bookings conflict with the slot
+   - Respects tenant's buffer time settings
+   - Optionally excludes a specific booking ID (useful for rescheduling)
+
+### Response Format
+
+```json
+{
+  "isAvailable": true/false,
+  "conflicts": [
+    {
+      "type": "WorkingHours",
+      "overlapStart": "2025-12-10T18:00:00Z",
+      "overlapEnd": "2025-12-10T19:00:00Z"
+    }
+  ]
+}
+```
+
+- When `isAvailable = true`: The `conflicts` list will be empty
+- When `isAvailable = false`: The `conflicts` list contains all conflicts preventing the booking
+- Each conflict includes:
+  - `type`: The type of conflict (TimeBlock, WorkingHours, Booking, BufferTime, or Unspecified)
+  - `overlapStart`: When the conflict begins
+  - `overlapEnd`: When the conflict ends
+
+### Error Handling
+
+The gRPC service handles errors gracefully:
+- Invalid GUIDs return `isAvailable = false` with an Unspecified conflict
+- Invalid time ranges return `isAvailable = false` with an Unspecified conflict
+- Unexpected exceptions return `isAvailable = false` with an Unspecified conflict
+- All responses are logged for debugging purposes
+
+### Integration Example
+
+**Booking Service Client:**
+```csharp
+var client = new AvailabilityService.AvailabilityService.AvailabilityServiceClient(channel);
+var request = new TimeSlotRequest
+{
+    TenantId = "456e7890-e89b-12d3-a456-426614174001",
+    ServiceId = "789e0123-e89b-12d3-a456-426614174000",
+    StartTime = Timestamp.FromDateTime(DateTime.UtcNow.AddHours(1)),
+    EndTime = Timestamp.FromDateTime(DateTime.UtcNow.AddHours(2))
+};
+
+var response = await client.CheckTimeSlotAvailabilityAsync(request);
+if (response.IsAvailable)
+{
+    // Proceed with booking creation
+}
+else
+{
+    // Build detailed error message from conflicts
+    var conflictMessages = response.Conflicts
+        .Select(c => $"{c.Type}: {c.OverlapStart:HH:mm} - {c.OverlapEnd:HH:mm}");
+
+    var errorMessage = $"The requested time slot is not available due to: {string.Join(", ", conflictMessages)}";
+
+    // Show error to user
+    Console.WriteLine(errorMessage);
+}
+```
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -521,6 +614,7 @@ Authorization: Bearer <token>
 | `DATABASE_CONNECTION_STRING` | Yes | PostgreSQL connection string |
 | `JWT_SECRET_KEY` | Yes | JWT signing key (minimum 128 bits) |
 | `ASPNETCORE_ENVIRONMENT` | No | Environment (Development/Production) |
+| `GRPC_URL` | No | gRPC service URL (default: http://localhost:5003) |
 
 ## Health Checks
 

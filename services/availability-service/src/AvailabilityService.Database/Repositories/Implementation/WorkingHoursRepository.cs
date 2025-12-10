@@ -66,11 +66,6 @@ public class WorkingHoursRepository(AvailabilityDbContext context) : IWorkingHou
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<WorkingHours>> GetWorkingHoursByTenantAndDateRangeAsync(Guid tenantId, DateTime startDate, DateTime endDate)
-    {
-        return await GetWorkingHoursByTenantAsync(tenantId);
-    }
-
     public async Task<bool> DeleteWorkingHoursAsync(Guid id)
     {
         var workingHours = await context.WorkingHours.FindAsync(id);

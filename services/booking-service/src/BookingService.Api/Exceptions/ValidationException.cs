@@ -16,17 +16,6 @@ public class ValidationException : BaseDomainException
 
     public ValidationException(string message) : base(message)
     {
-        ValidationErrors = new List<ValidationError>();
-    }
-
-    public ValidationException(string message, List<ValidationError> validationErrors)
-        : base(message)
-    {
-        ValidationErrors = validationErrors;
-    }
-
-    public ValidationException(string message, Exception innerException) : base(message, innerException)
-    {
-        ValidationErrors = new List<ValidationError>();
+        ValidationErrors = [];
     }
 }

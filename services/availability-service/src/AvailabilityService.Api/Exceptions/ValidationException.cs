@@ -2,31 +2,14 @@ using AvailabilityService.Api.Models;
 
 namespace AvailabilityService.Api.Exceptions;
 
-public class ValidationException : BaseDomainException
+public class ValidationException(string message, List<ValidationError> validationErrors) : BaseDomainException(message)
 {
     public override string ErrorCode => "VALIDATION_ERROR";
     
-    public List<ValidationError> ValidationErrors { get; }
+    public List<ValidationError> ValidationErrors { get; } = validationErrors;
 
     public ValidationException(List<ValidationError> validationErrors)
-        : base($"Validation failed with {validationErrors.Count} error(s).")
+        : this($"Validation failed with {validationErrors.Count} error(s).", validationErrors)
     {
-        ValidationErrors = validationErrors;
-    }
-
-    public ValidationException(string message) : base(message)
-    {
-        ValidationErrors = new List<ValidationError>();
-    }
-
-    public ValidationException(string message, List<ValidationError> validationErrors)
-        : base(message)
-    {
-        ValidationErrors = validationErrors;
-    }
-
-    public ValidationException(string message, Exception innerException) : base(message, innerException)
-    {
-        ValidationErrors = new List<ValidationError>();
     }
 }

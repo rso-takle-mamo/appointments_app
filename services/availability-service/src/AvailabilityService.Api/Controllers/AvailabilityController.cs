@@ -10,7 +10,7 @@ public class AvailabilityController(
     ILogger<AvailabilityController> logger,
     IAvailabilityService availabilityService,
     IUserContextService userContextService)
-    : BaseApiController
+    : BaseApiController(userContextService)
 {
     /// <summary>
     /// Get available time slots for booking
@@ -35,7 +35,6 @@ public class AvailabilityController(
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
     {
-            // Validate required date parameters
             if (!startDate.HasValue || !endDate.HasValue)
             {
                 var missingFields = new List<string>();
@@ -46,29 +45,24 @@ public class AvailabilityController(
                     missingFields.Select(f => new ValidationError { Field = f, Message = $"{f} is required" }).ToList());
             }
 
-            // Validate date range (max 1 month)
             if (endDate.Value - startDate.Value > TimeSpan.FromDays(31))
             {
                 throw new ValidationException("Date range cannot exceed 1 month",
-                    new List<ValidationError> {
-                        new ValidationError { Field = "endDate", Message = "Date range cannot exceed 1 month" }
-                    });
+                    [new ValidationError { Field = "endDate", Message = "Date range cannot exceed 1 month" }]);
             }
 
             Guid targetTenantId;
 
-            if (userContextService.IsCustomer())
+            if (IsCustomer())
             {
                 // Customer must provide tenantId in query
                 if (!tenantId.HasValue)
                 {
                     throw new ValidationException("tenantId query parameter is required for customers",
-                        new List<ValidationError> {
-                            new ValidationError { Field = "tenantId", Message = "tenantId query parameter is required for customers" }
-                        });
+                        [new ValidationError() { Field = "tenantId", Message = "tenantId query parameter is required for customers" }]);
                 }
                 targetTenantId = tenantId.Value;
-                userContextService.ValidateTenantAccess(targetTenantId, "Availability");
+                ValidateTenantAccess(targetTenantId);
             }
             else // Provider
             {
@@ -76,17 +70,21 @@ public class AvailabilityController(
                 if (tenantId.HasValue)
                 {
                     throw new ValidationException("Providers should not provide tenantId parameter. They can only check their own availability.",
-                        new List<ValidationError> {
-                            new ValidationError { Field = "tenantId", Message = "Providers should not provide tenantId parameter. They can only check their own availability." }
-                        });
+                    [
+                        new ValidationError
+                        {
+                            Field = "tenantId",
+                            Message =
+                                "Providers should not provide tenantId parameter. They can only check their own availability."
+                        }
+                    ]);
                 }
-                targetTenantId = userContextService.GetTenantId();
+                targetTenantId = GetTenantId() ?? throw new AuthorizationException("Availability", "read", "Providers must have a tenant ID.");
             }
 
             logger.LogInformation("Getting available time ranges for tenant: {TenantId}, from: {StartDate} to: {EndDate}",
                 targetTenantId, startDate, endDate);
 
-            // Get available time ranges
             var response = await availabilityService.GetAvailableRangesAsync(
                 targetTenantId,
                 startDate!.Value,

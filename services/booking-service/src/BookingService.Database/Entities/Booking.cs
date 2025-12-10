@@ -11,7 +11,7 @@ public class Booking
     public BookingStatus BookingStatus { get; set; }
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 
     // Navigation properties
     public virtual Tenant Tenant { get; set; } = null!;

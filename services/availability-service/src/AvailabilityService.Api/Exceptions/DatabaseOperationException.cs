@@ -15,9 +15,7 @@ public class DatabaseOperationException : BaseDomainException
         Operation = operation;
         Entity = entity;
     }
-
-    public DatabaseOperationException(string message, Exception innerException) : base(message, innerException) { }
-
+    
     public DatabaseOperationException(string operation, string entity, string message, Exception innerException) : base(message, innerException)
     {
         Operation = operation;
