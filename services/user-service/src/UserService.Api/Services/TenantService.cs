@@ -1,6 +1,7 @@
 using UserService.Api.Requests;
 using UserService.Api.Responses;
 using UserService.Api.Exceptions;
+using UserService.Api.Services.Interfaces;
 using UserService.Database.Entities;
 using UserService.Database.Repositories.Interfaces;
 using UserService.Database.Enums;
@@ -8,8 +9,7 @@ using UserService.Database.Enums;
 namespace UserService.Api.Services;
 
 public class TenantService(
-    ITenantRepository tenantRepository,
-    IUserRepository userRepository
+    ITenantRepository tenantRepository
 ) : ITenantService
 {
     public async Task<TenantResponse> GetTenantAsync(Guid tenantId, Guid userId)
@@ -38,11 +38,9 @@ public class TenantService(
         }
 
         var hasUpdates = false;
-        if (!string.IsNullOrEmpty(request.BusinessName) && request.BusinessName != tenant.BusinessName)
-        {
-            tenant.BusinessName = request.BusinessName;
-            hasUpdates = true;
-        }
+
+        // BusinessName and Address cannot be updated directly as they should come from VAT validation
+        // Only allow updating optional fields that are not tied to VAT verification
 
         if (request.BusinessEmail != tenant.BusinessEmail)
         {
@@ -53,12 +51,6 @@ public class TenantService(
         if (request.BusinessPhone != tenant.BusinessPhone)
         {
             tenant.BusinessPhone = request.BusinessPhone;
-            hasUpdates = true;
-        }
-
-        if (request.Address != tenant.Address)
-        {
-            tenant.Address = request.Address;
             hasUpdates = true;
         }
 

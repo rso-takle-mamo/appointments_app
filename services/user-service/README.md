@@ -28,10 +28,11 @@ The UserService manages user authentication, profiles, and tenant information fo
 |--------|---------------|-------------|-------------|
 | `Id` | UUID          | Primary Key | Tenant identifier |
 | `OwnerId` | UUID          | Required, Unique | User who owns this tenant |
-| `BusinessName` | VARCHAR(255)  | Required | Business name |
+| `VatNumber` | VARCHAR(20)   | Required | VAT number (validated via external API) |
+| `BusinessName` | VARCHAR(255)  | Required | Business name (from VAT validation) |
 | `BusinessEmail` | VARCHAR(255)  | Nullable | Business email |
 | `BusinessPhone` | VARCHAR(50)   | Nullable | Business phone |
-| `Address` | VARCHAR(500)  | Nullable | Business address |
+| `Address` | VARCHAR(500)  | Nullable | Business address (from VAT validation) |
 | `Description` | VARCHAR(1000) | Nullable | Business description |
 | `CreatedAt` | TIMESTAMPTZ   | Required | Creation timestamp |
 | `UpdatedAt` | TIMESTAMPTZ   | Required | Last update timestamp |
@@ -87,13 +88,43 @@ Content-Type: application/json
 }
 ```
 
+#### Check VAT Number
+```http
+GET /api/auth/check-vat?vatNumber=LU26375245
+```
+**Authentication:** None required
+**Description:** Validates a VAT number and retrieves company information from external VAT validation service
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `vatNumber` | string | Yes | VAT number to validate (format: CC followed by numbers) |
+
+**Response (Valid VAT):**
+```json
+{
+  "isValid": true,
+  "companyName": "AMAZON EUROPE CORE S.A R.L.",
+  "address": "38, AVENUE JOHN F. KENNEDY\nL-1855  LUXEMBOURG",
+  "countryCode": "LU",
+  "vatNumber": "LU26375245"
+}
+```
+
+**Response (Invalid VAT):**
+```json
+{
+  "message": "Invalid VAT number"
+}
+```
+
 #### Register Provider
 ```http
 POST /api/auth/register/provider
 Content-Type: application/json
 ```
 **Authentication:** None required
-**Description:** Creates a new provider account with associated tenant and returns JWT token
+**Description:** Creates a new provider account with associated tenant and returns JWT token. The VAT number is validated and company details are populated automatically.
 
 **Request Body:**
 ```json
@@ -103,13 +134,17 @@ Content-Type: application/json
   "firstName": "Jane",
   "lastName": "Smith",
   "email": "jane@business.com",
-  "businessName": "Jane's Professional Services",
+  "vatNumber": "LU26375245",
   "businessEmail": "contact@business.com",
   "businessPhone": "+1-555-123-4567",
-  "address": "123 Business St, City, State 12345",
   "description": "Professional consulting and advisory services"
 }
 ```
+
+**Note:**
+- `vatNumber` is required and will be validated
+- `businessName` and `address` are automatically populated from VAT validation and cannot be set manually
+- Optional fields: `businessEmail`, `businessPhone`, `description`
 
 **Response:**
 ```json
@@ -242,10 +277,11 @@ Authorization: Bearer <token>
 {
   "id": "456e7890-e89b-12d3-a456-426614174001",
   "ownerId": "123e4567-e89b-12d3-a456-426614174000",
-  "businessName": "Jane's Professional Services",
+  "vatNumber": "LU26375245",
+  "businessName": "AMAZON EUROPE CORE S.A R.L.",
   "businessEmail": "contact@business.com",
   "businessPhone": "+1-555-123-4567",
-  "address": "123 Business St, City, State 12345",
+  "address": "38, AVENUE JOHN F. KENNEDY\nL-1855  LUXEMBOURG",
   "description": "Professional consulting and advisory services",
   "createdAt": "2024-01-01T10:00:00Z",
   "updatedAt": "2024-01-01T10:00:00Z"
@@ -261,13 +297,13 @@ Authorization: Bearer <token>
 **Authentication:** Required (JWT token)
 **Description:** Updates tenant information (only tenant owners can update)
 
+**Note:** `businessName` and `address` cannot be updated as they are sourced from VAT validation. Only optional fields can be updated.
+
 **Request Body:**
 ```json
 {
-  "businessName": "Updated Business Name",
   "businessEmail": "updated@business.com",
   "businessPhone": "+1-555-987-6543",
-  "address": "456 New Address, City, State 67890",
   "description": "Updated business description"
 }
 ```
@@ -277,10 +313,11 @@ Authorization: Bearer <token>
 {
   "id": "456e7890-e89b-12d3-a456-426614174001",
   "ownerId": "123e4567-e89b-12d3-a456-426614174000",
-  "businessName": "Updated Business Name",
+  "vatNumber": "LU26375245",
+  "businessName": "AMAZON EUROPE CORE S.A R.L.",
   "businessEmail": "updated@business.com",
   "businessPhone": "+1-555-987-6543",
-  "address": "456 New Address, City, State 67890",
+  "address": "38, AVENUE JOHN F. KENNEDY\nL-1855  LUXEMBOURG",
   "description": "Updated business description",
   "createdAt": "2024-01-01T10:00:00Z",
   "updatedAt": "2024-01-01T11:00:00Z"
@@ -293,6 +330,7 @@ Authorization: Bearer <token>
 |----------|----------|-------------|
 | `DATABASE_CONNECTION_STRING` | Yes | PostgreSQL connection string |
 | `JWT_SECRET_KEY` | Yes | JWT signing key (minimum 128 bits) |
+| `VATCHECK_API_KEY` | Yes | API key for VAT validation service |
 | `ASPNETCORE_ENVIRONMENT` | No | Environment (Development/Production) |
 
 ## Health Checks

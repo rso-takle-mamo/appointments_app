@@ -55,6 +55,7 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
             AuthenticationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
             AuthorizationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
             DatabaseOperationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
+            VatValidationException ex => ErrorResponses.Create(ex.ErrorCode, ex.Message),
 
             // Database exceptions
             DbUpdateException ex => ErrorResponses.Create(
@@ -76,6 +77,7 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IM
             AuthenticationException => StatusCodes.Status401Unauthorized,
             AuthorizationException => StatusCodes.Status403Forbidden,
             DatabaseOperationException => StatusCodes.Status500InternalServerError,
+            VatValidationException => StatusCodes.Status503ServiceUnavailable,
 
             // Database exceptions
             DbUpdateException => StatusCodes.Status400BadRequest,

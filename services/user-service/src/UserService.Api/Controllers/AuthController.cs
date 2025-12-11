@@ -1,15 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using UserService.Api.Models;
 using UserService.Api.Requests;
-using UserService.Api.Responses;
-using UserService.Api.Services;
+using UserService.Api.Services.Interfaces;
 
 namespace UserService.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController(IAuthService authService) : ControllerBase
+public class AuthController(IAuthService authService, IVatValidationService vatValidationService) : ControllerBase
 {
     /// <summary>
     /// Register a new customer account
@@ -22,7 +20,7 @@ public class AuthController(IAuthService authService) : ControllerBase
         var response = await authService.RegisterCustomerAsync(request);
         return Ok(response);
     }
-  
+
     /// <summary>
     /// Register a new provider account with tenant information
     /// </summary>
@@ -36,6 +34,29 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
     
     /// <summary>
+    /// Validate a VAT number and retrieve company information
+    /// </summary>
+    /// <param name="vatNumber">The VAT number to validate</param>
+    /// <returns>Company information if VAT is valid</returns>
+    [HttpGet("tenants/check-vat")]
+    public async Task<IActionResult> CheckVat([FromQuery] string vatNumber)
+    {
+        if (string.IsNullOrWhiteSpace(vatNumber))
+        {
+            return BadRequest(new { message = "VAT number is required" });
+        }
+
+        var result = await vatValidationService.ValidateVatAsync(vatNumber);
+
+        if (!result.IsValid)
+        {
+            return BadRequest(new { message = "Invalid VAT number" });
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Authenticate user and return JWT token
     /// </summary>
     /// <param name="request">User login credentials</param>
@@ -46,7 +67,7 @@ public class AuthController(IAuthService authService) : ControllerBase
         var response = await authService.LoginAsync(request);
         return Ok(response);
     }
-    
+
     /// <summary>
     /// Logout user and invalidate the current session
     /// </summary>

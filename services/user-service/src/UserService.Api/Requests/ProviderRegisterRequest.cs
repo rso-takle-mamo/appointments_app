@@ -46,6 +46,14 @@ public class ProviderRegisterRequest
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
+    /// The VAT number of the provider
+    /// </summary>
+    /// <example>DE123456789</example>
+    [Required(ErrorMessage = "VAT number is required")]
+    [StringLength(20, ErrorMessage = "VAT number cannot be longer than 20 characters")]
+    public string VatNumber { get; set; } = string.Empty;
+
+    /// <summary>
     /// The business name of the provider
     /// </summary>
     /// <example>Jane's Professional Services</example>

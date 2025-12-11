@@ -31,6 +31,7 @@ services:
       - ASPNETCORE_URLS=http://+:8000
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${USER_DB_NAME};Username=${USER_DB_USERNAME};Password=${USER_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - VATCHECK_API_KEY=${VATCHECK_API_KEY}
     ports:
       - "8001:8000"
     depends_on:

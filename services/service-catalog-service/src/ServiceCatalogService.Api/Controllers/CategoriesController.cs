@@ -9,7 +9,8 @@ namespace ServiceCatalogService.Api.Controllers;
 
 [Route("api/categories")]
 [ApiController]
-public class CategoriesController(ICategoryService categoryService, IUserContextService userContextService) : ControllerBase
+public class CategoriesController(ICategoryService categoryService, IUserContextService userContextService)
+    : BaseApiController(userContextService)
 {
     /// <summary>
     /// Get category of a specific service
@@ -26,8 +27,8 @@ public class CategoriesController(ICategoryService categoryService, IUserContext
     [Authorize]
     public async Task<ActionResult<CategoryResponse>> GetServiceCategory(Guid serviceId)
     {
-        var isCustomer = userContextService.IsCustomer();
-        Guid? userTenantId = isCustomer ? null : userContextService.GetTenantId();
+        var isCustomer = IsCustomer();
+        var userTenantId = isCustomer ? null : GetTenantId();
 
         var category = await categoryService.GetServiceCategoryAsync(serviceId, isCustomer, userTenantId);
 
@@ -52,13 +53,8 @@ public class CategoriesController(ICategoryService categoryService, IUserContext
     [Authorize]
     public async Task<ActionResult<PaginatedResponse<CategoryResponse>>> GetCategories([FromQuery] Guid? tenantId, [FromQuery] PaginationRequest pagination)
     {
-        var isCustomer = userContextService.IsCustomer();
-        Guid? userTenantId = isCustomer ? null : userContextService.GetTenantId();
-
-        if (!isCustomer)
-        {
-            userContextService.ValidateProviderAccess();
-        }
+        var isCustomer = IsCustomer();
+        var userTenantId = isCustomer ? null : GetTenantId();
 
         var (categories, totalCount) = await categoryService.GetCategoriesAsync(tenantId, isCustomer, userTenantId, pagination.Offset, pagination.Limit);
 
@@ -83,10 +79,10 @@ public class CategoriesController(ICategoryService categoryService, IUserContext
     [Authorize]
     public async Task<ActionResult<CategoryResponse>> GetCategory(Guid categoryId)
     {
-        userContextService.ValidateProviderAccess();
-        var userTenantId = userContextService.GetTenantId();
+        ValidateProviderAccess("Category");
+        var userTenantId = GetTenantId();
 
-        var category = await categoryService.GetCategoryByIdAsync(categoryId, userTenantId);
+        var category = await categoryService.GetCategoryByIdAsync(categoryId, (Guid)userTenantId!);
 
         return Ok(category);
     }
@@ -103,10 +99,10 @@ public class CategoriesController(ICategoryService categoryService, IUserContext
     [Authorize]
     public async Task<ActionResult<CategoryResponse>> CreateCategory([FromBody] CreateCategoryRequest request)
     {
-        userContextService.ValidateProviderAccess();
-        var tenantId = userContextService.GetTenantId();
+        ValidateProviderAccess("Category");
+        var tenantId = GetTenantId();
 
-        var response = await categoryService.CreateCategoryAsync(request, tenantId);
+        var response = await categoryService.CreateCategoryAsync(request, (Guid)tenantId!);
 
         return CreatedAtAction(nameof(GetCategory), new { categoryId = response.Id }, response);
     }
@@ -121,10 +117,10 @@ public class CategoriesController(ICategoryService categoryService, IUserContext
     [Authorize]
     public async Task<ActionResult<CategoryResponse>> UpdateCategory(Guid categoryId, [FromBody] UpdateCategoryRequest request)
     {
-        userContextService.ValidateProviderAccess();
-        var userTenantId = userContextService.GetTenantId();
+        ValidateProviderAccess("Category");
+        var userTenantId = GetTenantId();
 
-        var response = await categoryService.UpdateCategoryAsync(categoryId, request, userTenantId);
+        var response = await categoryService.UpdateCategoryAsync(categoryId, request, (Guid) userTenantId!);
 
         return Ok(response);
     }
@@ -140,10 +136,10 @@ public class CategoriesController(ICategoryService categoryService, IUserContext
     [Authorize]
     public async Task<IActionResult> DeleteCategory(Guid categoryId)
     {
-        userContextService.ValidateProviderAccess();
-        var userTenantId = userContextService.GetTenantId();
+        ValidateProviderAccess("Category");
+        var userTenantId = GetTenantId();
 
-        await categoryService.DeleteCategoryAsync(categoryId, userTenantId);
+        await categoryService.DeleteCategoryAsync(categoryId, (Guid) userTenantId!);
 
         return NoContent();
     }

@@ -1,7 +1,7 @@
 using UserService.Api.Requests;
 using UserService.Api.Responses;
 
-namespace UserService.Api.Services;
+namespace UserService.Api.Services.Interfaces;
 
 public interface ITenantService
 {

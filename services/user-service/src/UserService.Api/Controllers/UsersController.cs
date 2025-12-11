@@ -1,12 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using UserService.Api.Requests;
-using UserService.Api.Responses;
-using UserService.Api.Services;
 using UserService.Api.Filters;
-using UserService.Api.Exceptions;
-using UserService.Api.Models;
+using UserService.Api.Services.Interfaces;
 
 namespace UserService.Api.Controllers;
 

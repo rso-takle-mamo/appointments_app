@@ -18,6 +18,12 @@ public class TenantResponse
     public required Guid OwnerId { get; set; }
 
     /// <summary>
+    /// The VAT number of the tenant
+    /// </summary>
+    /// <example>DE123456789</example>
+    public required string VatNumber { get; set; }
+
+    /// <summary>
     /// The business name of the tenant
     /// </summary>
     /// <example>Jane's Professional Services</example>
@@ -68,6 +74,7 @@ public static class TenantResponseExtensions
         {
             Id = tenant.Id,
             OwnerId = tenant.OwnerId,
+            VatNumber = tenant.VatNumber,
             BusinessName = tenant.BusinessName,
             BusinessEmail = tenant.BusinessEmail,
             BusinessPhone = tenant.BusinessPhone,

@@ -2,6 +2,7 @@ using UserService.Api.Requests;
 using UserService.Api.Responses;
 using UserService.Api.Extensions;
 using UserService.Api.Exceptions;
+using UserService.Api.Services.Interfaces;
 using UserService.Database.Entities;
 using UserService.Database.Enums;
 using UserService.Database.Repositories.Interfaces;

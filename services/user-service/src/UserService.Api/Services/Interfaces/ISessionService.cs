@@ -1,6 +1,6 @@
 using UserService.Database.Entities;
 
-namespace UserService.Api.Services;
+namespace UserService.Api.Services.Interfaces;
 
 public interface ISessionService
 {

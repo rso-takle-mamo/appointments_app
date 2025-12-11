@@ -17,7 +17,11 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
   
         builder.Property(t => t.OwnerId)
             .IsRequired();
-  
+        
+        builder.Property(t => t.VatNumber).
+            IsRequired().
+            HasMaxLength(50);
+        
         builder.Property(t => t.BusinessName)
             .IsRequired()
             .HasMaxLength(255);

@@ -7,6 +7,7 @@ using UserService.Database.Entities;
 using UserService.Database.Enums;
 using UserService.Database.Repositories.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
+using UserService.Api.Services.Interfaces;
 
 namespace UserService.Api.Services;
 
@@ -182,6 +183,7 @@ public class AuthService(IUserRepository userRepository, IJwtTokenService jwtTok
                 {
                     Id = Guid.NewGuid(),
                     OwnerId = newUser.Id,
+                    VatNumber = request.VatNumber,
                     BusinessName = request.BusinessName,
                     BusinessEmail = request.BusinessEmail,
                     BusinessPhone = request.BusinessPhone,

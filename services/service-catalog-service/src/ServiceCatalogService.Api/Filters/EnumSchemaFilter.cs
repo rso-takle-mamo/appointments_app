@@ -4,9 +4,6 @@ using Microsoft.OpenApi.Any;
 
 namespace ServiceCatalogService.Api.Filters;
 
-/// <summary>
-/// Schema filter to display enum values as strings instead of integers in Swagger UI
-/// </summary>
 public class EnumSchemaFilter : ISchemaFilter
 {
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)

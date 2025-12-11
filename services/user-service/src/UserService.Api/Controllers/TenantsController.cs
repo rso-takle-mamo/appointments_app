@@ -1,25 +1,25 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using UserService.Api.Requests;
-using UserService.Api.Responses;
-using UserService.Api.Services;
 using UserService.Api.Filters;
 using UserService.Api.Exceptions;
+using UserService.Api.Services.Interfaces;
 
 namespace UserService.Api.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/tenants")]
-public class TenantsController(ITenantService tenantService) : BaseApiController
+public class TenantsController(ITenantService tenantService)
+    : BaseApiController
 {
+
     /// <summary>
     /// Get tenant information by ID
     /// </summary>
     /// <param name="id">The tenant ID to retrieve</param>
     /// <returns>Tenant information</returns>
     [HttpGet("{id}")]
+    [Authorize]
     public async Task<IActionResult> GetTenant(Guid id)
     {
         var userId = GetUserIdFromToken();
@@ -46,6 +46,7 @@ public class TenantsController(ITenantService tenantService) : BaseApiController
     /// <param name="request">Tenant update information</param>
     /// <returns>Updated tenant information</returns>
     [HttpPatch("{id}")]
+    [Authorize]
     [ServiceFilter(typeof(ModelValidationFilter))]
     public async Task<IActionResult> UpdateTenant(Guid id, [FromBody] UpdateTenantRequest request)
     {

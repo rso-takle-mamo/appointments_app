@@ -1,3 +1,4 @@
+using UserService.Api.Services.Interfaces;
 using UserService.Database.Entities;
 using UserService.Database.Repositories.Interfaces;
 

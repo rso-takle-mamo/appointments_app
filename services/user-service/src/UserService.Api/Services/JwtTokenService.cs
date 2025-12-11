@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using UserService.Api.Services.Interfaces;
 using UserService.Database;
 using UserService.Database.Entities;
 

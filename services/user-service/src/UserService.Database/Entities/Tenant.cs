@@ -7,6 +7,8 @@ public class Tenant
     public Guid OwnerId { get; set; }
 
     public required string BusinessName { get; set; }
+    
+    public required string VatNumber { get; set; }
 
     public string? BusinessEmail { get; set; }
 

@@ -20,16 +20,10 @@ public class CategoryService(ICategoryRepository categoryRepository) : ICategory
             throw new NotFoundException("Category", $"No category found for service {serviceId}");
         }
 
-        if (!isCustomer)
-        {
-            // Provider validation
-            if (category.TenantId != userTenantId)
-            {
-                throw new AuthorizationException("Category", "access", "Access denied. Category belongs to a different tenant.");
-            }
-        }
+        if (isCustomer) return category.ToCategoryResponse();
 
-        return category.ToCategoryResponse();
+        // Provider validation
+        return category.TenantId != userTenantId ? throw new AuthorizationException("Category", "access", "Access denied. Category belongs to a different tenant.") : category.ToCategoryResponse();
     }
 
     public async Task<IEnumerable<CategoryResponse>> GetCategoriesAsync(Guid? tenantId, bool isCustomer, Guid? userTenantId)
@@ -39,9 +33,7 @@ public class CategoryService(ICategoryRepository categoryRepository) : ICategory
             if (!tenantId.HasValue)
             {
                 throw new ValidationException("TenantId is required for customers",
-                    new List<ValidationError> {
-                        new ValidationError { Field = "tenantId", Message = "TenantId is required for customers" }
-                    });
+                    [new ValidationError { Field = "tenantId", Message = "TenantId is required for customers" }]);
             }
 
             var categories = await categoryRepository.GetCategoriesByTenantIdAsync(tenantId.Value);
@@ -71,9 +63,7 @@ public class CategoryService(ICategoryRepository categoryRepository) : ICategory
             if (!tenantId.HasValue)
             {
                 throw new ValidationException("TenantId is required for customers",
-                    new List<ValidationError> {
-                        new ValidationError { Field = "tenantId", Message = "TenantId is required for customers" }
-                    });
+                    [new ValidationError { Field = "tenantId", Message = "TenantId is required for customers" }]);
             }
 
             var (categories, totalCount) = await categoryRepository.GetCategoriesByTenantIdAsync(tenantId.Value, offset, limit);
@@ -106,12 +96,7 @@ public class CategoryService(ICategoryRepository categoryRepository) : ICategory
         }
 
         // Tenant validation
-        if (category.TenantId != userTenantId)
-        {
-            throw new AuthorizationException("Category", "access", "Access denied. Category belongs to a different tenant.");
-        }
-
-        return category.ToCategoryResponse();
+        return category.TenantId != userTenantId ? throw new AuthorizationException("Category", "access", "Access denied. Category belongs to a different tenant.") : category.ToCategoryResponse();
     }
 
     public async Task<CategoryResponse> CreateCategoryAsync(CreateCategoryRequest request, Guid tenantId)
@@ -187,11 +172,6 @@ public class CategoryService(ICategoryRepository categoryRepository) : ICategory
 
         var success = await categoryRepository.DeleteCategoryAsync(categoryId);
 
-        if (!success)
-        {
-            throw new DatabaseOperationException("Delete", "Category", "Failed to delete category");
-        }
-
-        return true;
+        return !success ? throw new DatabaseOperationException("Delete", "Category", "Failed to delete category") : true;
     }
 }

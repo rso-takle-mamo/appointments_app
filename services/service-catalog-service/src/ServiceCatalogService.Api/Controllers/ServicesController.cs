@@ -9,7 +9,8 @@ namespace ServiceCatalogService.Api.Controllers;
 
 [ApiController]
 [Route("api/services")]
-public class ServicesController(IServiceService serviceService, IUserContextService userContextService) : ControllerBase
+public class ServicesController(IServiceService serviceService, IUserContextService userContextService)
+    : BaseApiController(userContextService)
 {
     /// <summary>
     /// Get services with filtering and pagination
@@ -26,8 +27,8 @@ public class ServicesController(IServiceService serviceService, IUserContextServ
     [Authorize]
     public async Task<ActionResult<PaginatedResponse<ServiceResponse>>> GetServices([FromQuery] ServiceFilterRequest request)
     {
-        var isCustomer = userContextService.IsCustomer();
-        Guid? userTenantId = isCustomer ? null : userContextService.GetTenantId();
+        var isCustomer = IsCustomer();
+        var userTenantId = isCustomer ? null : GetTenantId();
 
         var (services, totalCount) = await serviceService.GetServicesAsync(request, isCustomer, userTenantId);
 
@@ -56,8 +57,8 @@ public class ServicesController(IServiceService serviceService, IUserContextServ
     [Authorize]
     public async Task<ActionResult<ServiceResponse>> GetService(Guid id)
     {
-        var isCustomer = userContextService.IsCustomer();
-        Guid? userTenantId = isCustomer ? null : userContextService.GetTenantId();
+        var isCustomer = IsCustomer();
+        var userTenantId = isCustomer ? null : GetTenantId();
 
         var service = await serviceService.GetServiceByIdAsync(id, isCustomer, userTenantId);
 
@@ -76,10 +77,10 @@ public class ServicesController(IServiceService serviceService, IUserContextServ
     [Authorize]
     public async Task<ActionResult<ServiceResponse>> CreateService([FromBody] CreateServiceRequest request)
     {
-        userContextService.ValidateProviderAccess();
-        var tenantId = userContextService.GetTenantId();
+        ValidateProviderAccess("Service");
+        var tenantId = GetTenantId();
 
-        var response = await serviceService.CreateServiceAsync(request, tenantId);
+        var response = await serviceService.CreateServiceAsync(request, (Guid)tenantId!);
 
         return CreatedAtAction(nameof(GetService), new { id = response.Id }, response);
     }
@@ -94,10 +95,10 @@ public class ServicesController(IServiceService serviceService, IUserContextServ
     [Authorize]
     public async Task<ActionResult<ServiceResponse>> UpdateService(Guid id, [FromBody] UpdateServiceRequest request)
     {
-        userContextService.ValidateProviderAccess();
-        var userTenantId = userContextService.GetTenantId();
+        ValidateProviderAccess("Service");
+        var userTenantId = GetTenantId();
 
-        var response = await serviceService.UpdateServiceAsync(id, request, userTenantId);
+        var response = await serviceService.UpdateServiceAsync(id, request, (Guid) userTenantId!);
 
         return Ok(response);
     }
@@ -113,10 +114,10 @@ public class ServicesController(IServiceService serviceService, IUserContextServ
     [Authorize]
     public async Task<IActionResult> DeleteService(Guid id)
     {
-        userContextService.ValidateProviderAccess();
-        var userTenantId = userContextService.GetTenantId();
+        ValidateProviderAccess("Service");
+        var userTenantId = GetTenantId();
 
-        await serviceService.DeleteServiceAsync(id, userTenantId);
+        await serviceService.DeleteServiceAsync(id, (Guid) userTenantId!);
 
         return NoContent();
     }

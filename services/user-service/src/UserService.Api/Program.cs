@@ -12,6 +12,7 @@ using UserService.Api.Filters;
 using UserService.Api.Configuration;
 using UserService.Database;
 using Microsoft.AspNetCore.Mvc;
+using UserService.Api.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -128,6 +129,7 @@ builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService.Api.Services.UserService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
+builder.Services.AddScoped<IVatValidationService, VatValidationService>();
 
 var app = builder.Build();
 

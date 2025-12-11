@@ -17,7 +17,6 @@ public class ServiceService(IServiceRepository serviceRepository) : IServiceServ
         bool isCustomer,
         Guid? userTenantId)
     {
-        // Customer-only filters validation
         if (!isCustomer)
         {
             if (!string.IsNullOrEmpty(request.Address) || !string.IsNullOrEmpty(request.BusinessName))
@@ -55,7 +54,7 @@ public class ServiceService(IServiceRepository serviceRepository) : IServiceServ
                 BusinessName = request.BusinessName
             };
         }
-        else // Provider
+        else
         {
             // providers should not attempt to specify tenantId in query parameters
             if (request.TenantId.HasValue)
@@ -73,8 +72,8 @@ public class ServiceService(IServiceRepository serviceRepository) : IServiceServ
                 CategoryId = request.CategoryId,
                 CategoryName = request.CategoryName,
                 IsActive = request.IsActive,
-                Address = null, // Providers cannot use tenant-based filters
-                BusinessName = null // Providers cannot use tenant-based filters
+                Address = null,
+                BusinessName = null
             };
         }
 
@@ -93,16 +92,9 @@ public class ServiceService(IServiceRepository serviceRepository) : IServiceServ
             throw new NotFoundException("Service", id);
         }
 
-        if (!isCustomer)
-        {
-            // Provider validation
-            if (service.TenantId != userTenantId)
-            {
-                throw new AuthorizationException("Service", "access", "Access denied. Service belongs to a different tenant.");
-            }
-        }
-
-        return service.ToServiceResponse();
+        if (isCustomer) return service.ToServiceResponse();
+        
+        return service.TenantId != userTenantId ? throw new AuthorizationException("Service", "access", "Access denied. Service belongs to a different tenant.") : service.ToServiceResponse();
     }
 
     public async Task<ServiceResponse> CreateServiceAsync(CreateServiceRequest request, Guid tenantId)
@@ -124,7 +116,6 @@ public class ServiceService(IServiceRepository serviceRepository) : IServiceServ
             throw new NotFoundException("Service", id);
         }
 
-        // Tenant validation
         if (existingService.TenantId != userTenantId)
         {
             throw new AuthorizationException("Service", "update", "Access denied. Cannot update service from different tenant.");
@@ -160,7 +151,6 @@ public class ServiceService(IServiceRepository serviceRepository) : IServiceServ
             throw new NotFoundException("Service", id);
         }
 
-        // Tenant validation
         if (existingService.TenantId != userTenantId)
         {
             throw new AuthorizationException("Service", "delete", "Access denied. Cannot delete service from different tenant.");
@@ -168,11 +158,6 @@ public class ServiceService(IServiceRepository serviceRepository) : IServiceServ
 
         var success = await serviceRepository.DeleteServiceAsync(id);
 
-        if (!success)
-        {
-            throw new DatabaseOperationException("Delete", "Service", "Failed to delete service");
-        }
-
-        return true;
+        return !success ? throw new DatabaseOperationException("Delete", "Service", "Failed to delete service") : true;
     }
 }
