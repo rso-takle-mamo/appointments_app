@@ -14,7 +14,7 @@ using ServiceCatalogService.Api.Filters;
 using ServiceCatalogService.Api.Configuration;
 using ServiceCatalogService.Database;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -171,6 +171,10 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Add /metrics endpoints for Prometheus
+app.UseHttpMetrics(); 
+app.MapMetrics();
 
 app.MapControllers();
 

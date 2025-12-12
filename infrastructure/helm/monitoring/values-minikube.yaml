@@ -1,0 +1,135 @@
+# Minikube-specific values for monitoring stack
+
+# Global configuration
+global:
+  storageClass: "standard"
+
+# Prometheus Configuration
+prometheus:
+  enabled: true
+
+  server:
+    # Reduce resource requirements for Minikube
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+    # Smaller storage for Minikube
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+
+    # Shorter retention period
+    retention: "7d"
+
+    # Ingress configuration - disabled to use custom ingress
+    ingress:
+      enabled: false
+
+  nodeExporter:
+    enabled: true
+    resources:
+      limits:
+        cpu: 100m
+        memory: 30Mi
+      requests:
+        cpu: 50m
+        memory: 20Mi
+
+# Grafana Configuration
+grafana:
+  enabled: true
+
+  # Smaller resource requirements for Minikube
+  resources:
+    limits:
+      cpu: 200m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  # Smaller storage for Minikube
+  persistence:
+    enabled: true
+    size: 5Gi
+
+  # Ingress configuration - disabled to use custom ingress
+  ingress:
+    enabled: false
+
+  # Grafana configuration for Minikube
+  grafana.ini:
+    server:
+      root_url: http://localhost:3000/
+      serve_from_sub_path: false
+    auth.anonymous:
+      enabled: false
+
+  # Data sources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://monitoring-prometheus-server.monitoring.svc.cluster.local:80
+          access: proxy
+          isDefault: true
+          editable: true
+
+# Service Monitor Configuration
+serviceMonitors:
+  enabled: true
+
+  # Service monitor for user service
+  userService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-user
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for service catalog service
+  serviceCatalogService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-servicecatalog
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for availability service
+  availabilityService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-availability
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for booking service
+  bookingService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-booking
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+# Disable alert manager for Minikube
+alertmanager:
+  enabled: false

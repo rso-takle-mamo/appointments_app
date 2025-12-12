@@ -1,0 +1,220 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  # Main Appointments App Dashboard
+  appointments-app.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Appointments App Overview",
+        "tags": ["appointments-app", "overview"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=~\".*-service\"}[5m])) by (job)",
+                "legendFormat": "{{`{{job}}`}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=~\".*-service\",status=~\"5..\"}[5m])) by (job)",
+                "legendFormat": "5xx errors - {{`{{job}}`}}"
+              },
+              {
+                "expr": "sum(rate(http_requests_total{job=~\".*-service\",status=~\"4..\"}[5m])) by (job)",
+                "legendFormat": "4xx errors - {{`{{job}}`}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Errors/sec"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Response Time (95th percentile)",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=~\".*-service\"}[5m])) by (le, job))",
+                "legendFormat": "95th percentile - {{`{{job}}`}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Seconds"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Service Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=~\".*-service\"}",
+                "legendFormat": "{{`{{instance}}`}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "mappings": [
+                  {
+                    "options": {
+                      "0": {
+                        "text": "DOWN",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "UP",
+                        "color": "green"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Active Database Connections",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(db_pool_connections_active) by (service)",
+                "legendFormat": "Active - {{`{{service}}`}}"
+              },
+              {
+                "expr": "sum(db_pool_connections_idle) by (service)",
+                "legendFormat": "Idle - {{`{{service}}`}}"
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Memory Usage by Pod",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(container_memory_usage_bytes{namespace=\"appointments-app\"}) by (pod)",
+                "legendFormat": "{{`{{pod}}`}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Bytes",
+                "format": "bytes"
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "title": "CPU Usage by Pod",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"appointments-app\"}[5m])) by (pod)",
+                "legendFormat": "{{`{{pod}}`}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Cores"
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "title": "gRPC Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(grpc_server_started_total{grpc_service=~\".*\"}[5m])) by (grpc_service)",
+                "legendFormat": "{{`{{grpc_service}}`}}"
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "5s"
+      }
+    }
+
+  # Kubernetes Resources Dashboard
+  kubernetes-resources.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Kubernetes Resources",
+        "tags": ["kubernetes", "resources"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Cluster CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total[5m])) by (pod)",
+                "legendFormat": "{{`{{pod}}`}}"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Cluster Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(container_memory_usage_bytes) by (pod)",
+                "legendFormat": "{{`{{pod}}`}}"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Pod Restart Count",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kube_pod_container_status_restarts_total",
+                "legendFormat": "{{`{{pod}}`}} - {{`{{container}}`}}"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        }
+      }
+    }

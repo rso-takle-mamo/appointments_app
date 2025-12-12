@@ -1,0 +1,22 @@
+{{- if .Values.services.serviceCatalog.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "appointments-app.service.name" (dict "context" . "name" "serviceCatalog") }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "appointments-app.service.labels" (dict "context" . "name" "serviceCatalog") | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "{{ .Values.services.serviceCatalog.port }}"
+    prometheus.io/path: "/metrics"
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.services.serviceCatalog.port }}
+    targetPort: {{ .Values.services.serviceCatalog.port }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "appointments-app.service.selectorLabels" (dict "context" . "name" "serviceCatalog") | nindent 4 }}
+{{- end }}

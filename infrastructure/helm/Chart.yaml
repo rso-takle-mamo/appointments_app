@@ -1,0 +1,16 @@
+apiVersion: v2
+name: appointments-app
+description: A Helm chart for Appointments App microservices
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - microservices
+  - appointments
+  - booking
+  - dotnet
+
+maintainers:
+  - name: Appointments App Team
+    email: team@appointments-app.com

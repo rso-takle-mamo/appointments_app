@@ -1,0 +1,76 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "appointments-app.fullname" . }}-ingress
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "appointments-app.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      # User Service endpoints
+      {{- if .Values.services.user.enabled }}
+      - path: {{ .Values.ingress.paths.auth }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "appointments-app.service.name" (dict "context" . "name" "user") }}
+            port:
+              number: {{ .Values.services.user.port }}
+      - path: {{ .Values.ingress.paths.users }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "appointments-app.service.name" (dict "context" . "name" "user") }}
+            port:
+              number: {{ .Values.services.user.port }}
+      - path: {{ .Values.ingress.paths.tenants }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "appointments-app.service.name" (dict "context" . "name" "user") }}
+            port:
+              number: {{ .Values.services.user.port }}
+      {{- end }}
+      # Service Catalog Service endpoints
+      {{- if .Values.services.serviceCatalog.enabled }}
+      - path: {{ .Values.ingress.paths.services }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "appointments-app.service.name" (dict "context" . "name" "serviceCatalog") }}
+            port:
+              number: {{ .Values.services.serviceCatalog.port }}
+      - path: {{ .Values.ingress.paths.categories }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "appointments-app.service.name" (dict "context" . "name" "serviceCatalog") }}
+            port:
+              number: {{ .Values.services.serviceCatalog.port }}
+      {{- end }}
+      # Availability Service endpoints
+      {{- if .Values.services.availability.enabled }}
+      - path: {{ .Values.ingress.paths.availability }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "appointments-app.service.name" (dict "context" . "name" "availability") }}
+            port:
+              number: {{ .Values.services.availability.port }}
+      {{- end }}
+      # Booking Service endpoints
+      {{- if .Values.services.booking.enabled }}
+      - path: {{ .Values.ingress.paths.bookings }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "appointments-app.service.name" (dict "context" . "name" "booking") }}
+            port:
+              number: {{ .Values.services.booking.port }}
+      {{- end }}
+{{- end }}

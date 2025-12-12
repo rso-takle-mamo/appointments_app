@@ -1,0 +1,30 @@
+﻿apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migration-booking-job
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migration-booking
+        image: booking-database-migrator:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: DATABASE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              key: migration-connection-string
+              name: booking-service-db-secret
+        - name: DATABASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: db-username
+              name: booking-service-db-secret
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: db-password
+              name: booking-service-db-secret
+        - name: TARGET_MIGRATION
+          value: $EXTERNAL_TARGET_MIGRATION # This has to be set externally. Empty means upgrade to latest version.

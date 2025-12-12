@@ -12,7 +12,11 @@ using UserService.Api.Filters;
 using UserService.Api.Configuration;
 using UserService.Database;
 using Microsoft.AspNetCore.Mvc;
+// using OpenTelemetry.Metrics;
+// using OpenTelemetry.Resources;
+using Prometheus;
 using UserService.Api.Services.Interfaces;
+// using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -131,6 +135,25 @@ builder.Services.AddScoped<IUserService, UserService.Api.Services.UserService>()
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IVatValidationService, VatValidationService>();
 
+// builder.Services.AddOpenTelemetry()
+//     .WithMetrics(metrics =>
+//     {
+//         metrics
+//             .AddAspNetCoreInstrumentation()
+//             .AddHttpClientInstrumentation()
+//             .AddPrometheusExporter();
+//     });
+
+// builder.Services.AddOpenTelemetry()
+//     .ConfigureResource(resource => resource
+//         .AddService(serviceName: builder.Environment.ApplicationName))
+//     .WithMetrics(metrics => metrics
+//         .AddAspNetCoreInstrumentation()
+//         .AddConsoleExporter((exporterOptions, metricReaderOptions) =>
+//         {
+//             metricReaderOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 1000;
+//         }));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -159,10 +182,18 @@ app.UseMiddleware<GlobalExceptionHandler>();
 
 app.UseHttpsRedirection();
 
+// app.UseRouting();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Add /metrics endpoints for Prometheus
+app.UseHttpMetrics();
+app.MapMetrics();
+
+
 app.MapControllers();
+
 
 // Health check endpoints
 app.MapHealthChecks("/health", new HealthCheckOptions

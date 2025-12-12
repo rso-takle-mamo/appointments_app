@@ -1,0 +1,123 @@
+{{- if .Values.services.user.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "appointments-app.service.name" (dict "context" . "name" "user") }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "appointments-app.service.labels" (dict "context" . "name" "user") | nindent 4 }}
+spec:
+  replicas: {{ .Values.services.user.replicas }}
+  selector:
+    matchLabels:
+      {{- include "appointments-app.service.selectorLabels" (dict "context" . "name" "user") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "appointments-app.service.selectorLabels" (dict "context" . "name" "user") | nindent 8 }}
+    spec:
+      {{- if .Values.postgresql.init.enabled }}
+      initContainers:
+      - name: user-db-init
+        image: {{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        env:
+        - name: PGHOST
+          value: {{ include "appointments-app.postgresql.name" . }}
+        - name: PGUSER
+          value: {{ .Values.postgresql.admin.username }}
+        - name: PGPASSWORD
+          value: {{ .Values.postgresql.admin.password }}
+        - name: DB_NAME
+          value: {{ .Values.services.user.database.name }}
+        - name: DB_USER
+          value: {{ .Values.services.user.database.user }}
+        - name: DB_PASSWORD
+          value: {{ .Values.services.user.database.password }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Wait for PostgreSQL to be ready
+          echo "Waiting for PostgreSQL to be ready..."
+          until pg_isready -h $PGHOST -U $PGUSER; do
+            echo "PostgreSQL is not ready yet..."
+            sleep 2
+          done
+
+          echo "PostgreSQL is ready! Setting up user database..."
+
+          # Create database if it doesn't exist
+          psql -h $PGHOST -U $PGUSER -tc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1 || \
+          psql -h $PGHOST -U $PGUSER -c "CREATE DATABASE $DB_NAME;"
+
+          # Create user if it doesn't exist
+          psql -h $PGHOST -U $PGUSER -tc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1 || \
+          psql -h $PGHOST -U $PGUSER -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
+
+          # Grant privileges
+          psql -h $PGHOST -U $PGUSER -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
+          psql -h $PGHOST -U $PGUSER -d $DB_NAME -c "GRANT ALL ON SCHEMA public TO $DB_USER; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;"
+
+          echo "User database setup complete!"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      {{- end }}
+      containers:
+      - name: {{ include "appointments-app.service.name" (dict "context" . "name" "user") }}
+        image: {{ .Values.services.user.image }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - containerPort: {{ .Values.services.user.port }}
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: {{ .Values.global.environment }}
+        - name: ASPNETCORE_URLS
+          value: "http://+:{{ .Values.services.user.port }}"
+        - name: DATABASE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "appointments-app.secret.name" (dict "context" . "name" "user") }}
+              key: connection-string
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "appointments-app.fullname" . }}-secrets
+              key: jwt-secret-key
+        - name: VATCHECK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "appointments-app.fullname" . }}-secrets
+              key: vatcheck-api-key
+        resources:
+          {{- toYaml .Values.services.user.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.services.user.health.livenessPath }}
+            port: {{ .Values.services.user.port }}
+          initialDelaySeconds: {{ .Values.healthProbes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthProbes.liveness.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthProbes.liveness.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthProbes.liveness.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.services.user.health.readinessPath }}
+            port: {{ .Values.services.user.port }}
+          initialDelaySeconds: {{ .Values.healthProbes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthProbes.readiness.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthProbes.readiness.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthProbes.readiness.failureThreshold }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.services.user.health.livenessPath }}
+            port: {{ .Values.services.user.port }}
+          initialDelaySeconds: {{ .Values.healthProbes.startup.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthProbes.startup.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthProbes.startup.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthProbes.startup.failureThreshold }}
+{{- end }}

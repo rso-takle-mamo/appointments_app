@@ -1,0 +1,38 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "appointments-app.postgresql.name" . }}-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "appointments-app.postgresql.labels" . | nindent 4 }}
+data:
+  postgresql.conf: |
+    # PostgreSQL configuration file for shared instance
+
+    # Connection settings
+    listen_addresses = '*'
+    port = {{ .Values.postgresql.port }}
+
+    # Memory settings (increased for multi-database)
+    shared_buffers = {{ .Values.postgresql.config.sharedBuffers }}
+    effective_cache_size = {{ .Values.postgresql.config.effectiveCacheSize }}
+    work_mem = 4MB
+
+    # Logging
+    log_statement = 'all'
+    log_duration = on
+    log_database = on
+
+    # Performance settings
+    max_connections = {{ .Values.postgresql.config.maxConnections }}
+    checkpoint_completion_target = 0.9
+    wal_buffers = 32MB
+    maintenance_work_mem = 64MB
+
+    # Charset
+    default_text_search_config = 'pg_catalog.english'
+
+    # Security
+    ssl = off
+{{- end }}

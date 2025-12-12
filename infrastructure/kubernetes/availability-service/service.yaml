@@ -2,6 +2,13 @@
 kind: Service
 metadata:
   name: availability-service
+  namespace: appointments-app
+  labels:
+    app: availability-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
   selector:

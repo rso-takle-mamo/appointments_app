@@ -1,0 +1,41 @@
+{{- if and .Values.migrations.enabled .Values.services.availability.enabled .Values.services.availability.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "appointments-app.migration.name" (dict "name" "availability") }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "appointments-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+spec:
+  ttlSecondsAfterFinished: {{ .Values.migrations.jobTtlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "appointments-app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migration-availability
+        image: {{ .Values.services.availability.migration.image }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        env:
+        - name: DATABASE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              key: migration-connection-string
+              name: {{ include "appointments-app.secret.name" (dict "context" . "name" "availability") }}
+        - name: DATABASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: db-username
+              name: {{ include "appointments-app.secret.name" (dict "context" . "name" "availability") }}
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: db-password
+              name: {{ include "appointments-app.secret.name" (dict "context" . "name" "availability") }}
+        - name: TARGET_MIGRATION
+          value: {{ .Values.migrations.targetMigration }}
+{{- end }}

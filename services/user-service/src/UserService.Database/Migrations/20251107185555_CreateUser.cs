@@ -15,7 +15,9 @@ namespace UserService.Database.Migrations
         {
             var userName = EnvironmentVariables.GetRequiredVariable("DATABASE_USERNAME");
             var password = EnvironmentVariables.GetRequiredVariable("DATABASE_PASSWORD");
+            // migrationBuilder.Sql($"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{userName}') THEN CREATE USER {userName} WITH PASSWORD '{password}'; END IF; END $$;");
             migrationBuilder.Sql($"CREATE USER {userName} WITH PASSWORD '{password}';");
+            migrationBuilder.Sql($"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {userName};");
             migrationBuilder.Sql($"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {userName};");
         }
 

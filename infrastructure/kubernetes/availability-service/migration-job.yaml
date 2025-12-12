@@ -7,8 +7,8 @@ spec:
     spec:
       restartPolicy: Never
       containers:
-      - name: migration-service-catalog
-        image: service-catalog-database-migrator:latest
+      - name: migration-availability
+        image: availability-database-migrator:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: DATABASE_CONNECTION_STRING

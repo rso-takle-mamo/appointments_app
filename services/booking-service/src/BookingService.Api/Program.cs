@@ -13,6 +13,7 @@ using BookingService.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -172,6 +173,10 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Add /metrics endpoints for Prometheus
+app.UseHttpMetrics(); 
+app.MapMetrics();
 
 app.MapControllers();
 

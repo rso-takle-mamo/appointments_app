@@ -1,0 +1,22 @@
+{{- if .Values.services.availability.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "appointments-app.service.name" (dict "context" . "name" "availability") }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "appointments-app.service.labels" (dict "context" . "name" "availability") | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "{{ .Values.services.availability.port }}"
+    prometheus.io/path: "/metrics"
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.services.availability.port }}
+    targetPort: {{ .Values.services.availability.port }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "appointments-app.service.selectorLabels" (dict "context" . "name" "availability") | nindent 4 }}
+{{- end }}
