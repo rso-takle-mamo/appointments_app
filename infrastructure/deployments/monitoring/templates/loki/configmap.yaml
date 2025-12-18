@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-loki-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  config.yaml: |
+    auth_enabled: {{ .Values.loki.structuredConfig.auth_enabled }}
+
+    server:
+      http_listen_port: {{ .Values.loki.structuredConfig.server.http_listen_port }}
+
+    # Explicitly set replication factor to 1 for single-node deployment
+    common:
+      replication_factor: 1
+
+    # Disable clustering for single binary
+    memberlist:
+      join_members: {{ .Values.loki.structuredConfig.memberlist.join_members }}
+
+    ingester:
+      lifecycler:
+        address: {{ .Values.loki.structuredConfig.ingester.lifecycler.address }}
+        ring:
+          kvstore:
+            store: {{ .Values.loki.structuredConfig.ingester.lifecycler.ring.kvstore.store }}
+          replication_factor: {{ .Values.loki.structuredConfig.ingester.lifecycler.ring.replication_factor }}
+      chunk_idle_period: {{ .Values.loki.structuredConfig.ingester.chunk_idle_period }}
+      max_chunk_age: {{ .Values.loki.structuredConfig.ingester.max_chunk_age }}
+      chunk_target_size: {{ .Values.loki.structuredConfig.ingester.chunk_target_size }}
+      wal:
+        enabled: true
+        dir: /wal
+
+    schema_config:
+      configs:
+{{- range .Values.loki.structuredConfig.schema_config.configs }}
+        - from: {{ .from }}
+          store: {{ .store }}
+          object_store: {{ .object_store }}
+          schema: {{ .schema }}
+          index:
+            prefix: {{ .index.prefix }}
+            period: {{ .index.period }}
+{{- end }}
+
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: {{ .Values.loki.structuredConfig.storage_config.boltdb_shipper.active_index_directory }}
+        cache_location: {{ .Values.loki.structuredConfig.storage_config.boltdb_shipper.cache_location }}
+        shared_store: {{ .Values.loki.structuredConfig.storage_config.boltdb_shipper.shared_store }}
+      filesystem:
+        directory: {{ .Values.loki.structuredConfig.storage_config.filesystem.directory }}
+
+    limits_config:
+      enforce_metric_name: {{ .Values.loki.structuredConfig.limits_config.enforce_metric_name }}
+      reject_old_samples: {{ .Values.loki.structuredConfig.limits_config.reject_old_samples }}
+      reject_old_samples_max_age: {{ .Values.loki.structuredConfig.limits_config.reject_old_samples_max_age }}
+      max_cache_freshness_per_query: {{ .Values.loki.structuredConfig.limits_config.max_cache_freshness_per_query }}
+      split_queries_by_interval: {{ .Values.loki.structuredConfig.limits_config.split_queries_by_interval }}
+
+    table_manager:
+      retention_deletes_enabled: {{ .Values.loki.structuredConfig.table_manager.retention_deletes_enabled }}
+      retention_period: {{ .Values.loki.structuredConfig.table_manager.retention_period }}
+
+    compactor:
+      working_directory: /loki/compactor
+      shared_store: filesystem

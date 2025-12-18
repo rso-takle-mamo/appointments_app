@@ -1,0 +1,322 @@
+# Minikube-specific values for monitoring stack
+
+# Global configuration
+global:
+  storageClass: "standard"
+
+# Prometheus Configuration
+prometheus:
+  enabled: true
+
+  server:
+    # Reduce resource requirements for Minikube
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+    # Smaller storage for Minikube
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+
+    # Shorter retention period
+    retention: "7d"
+
+    # Ingress configuration - disabled to use custom ingress
+    ingress:
+      enabled: false
+
+  nodeExporter:
+    enabled: true
+    resources:
+      limits:
+        cpu: 100m
+        memory: 30Mi
+      requests:
+        cpu: 50m
+        memory: 20Mi
+
+# Grafana Configuration
+grafana:
+  enabled: true
+
+  # Smaller resource requirements for Minikube
+  resources:
+    limits:
+      cpu: 200m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  # Smaller storage for Minikube
+  persistence:
+    enabled: true
+    size: 5Gi
+
+  # Ingress configuration - disabled to use custom ingress
+  ingress:
+    enabled: false
+
+  # Grafana configuration for Minikube
+  grafana.ini:
+    server:
+      root_url: http://localhost:3000/
+      serve_from_sub_path: false
+    auth.anonymous:
+      enabled: false
+
+  # Dashboard providers
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  # Alerting disabled - manually configure in Grafana UI
+  # alerting:
+  #   enabled: true
+
+  # Sidecar configuration for loading dashboards
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /tmp/dashboards
+      searchNamespace: monitoring
+      provider:
+        allowUiUpdates: true
+        foldersFromFilesStructure: true
+      # Additional configuration for better visibility
+      defaultFolderName: "Appointments"
+
+  # Data sources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://monitoring-prometheus-server.monitoring.svc.cluster.local:80
+          access: proxy
+          isDefault: true
+          editable: true
+        - name: Loki
+          type: loki
+          url: http://monitoring-loki.monitoring.svc.cluster.local:3100
+          access: proxy
+          isDefault: false
+          editable: true
+
+# Service Monitor Configuration
+serviceMonitors:
+  enabled: true
+
+  # Service monitor for user service
+  userService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-user
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for service catalog service
+  serviceCatalogService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-servicecatalog
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for availability service
+  availabilityService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-availability
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for booking service
+  bookingService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-booking
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+# Disable alert manager for Minikube
+alertmanager:
+  enabled: false
+
+# Loki Configuration for Minikube (lighter resources)
+loki:
+  enabled: true
+
+  # Loki image
+  image:
+    repository: grafana/loki
+    tag: 2.9.10
+    pullPolicy: IfNotPresent
+
+  # ServiceAccount configuration
+  serviceAccount:
+    create: true
+    annotations: {}
+
+  # Explicitly set deployment mode
+  deploymentMode: SingleBinary
+
+  # Use single binary mode for simplicity
+  singleBinary:
+    replicas: 1
+
+    # Persistent storage
+    persistence:
+      enabled: true
+      size: 5Gi
+
+    # Resources - increased for stability
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 512Mi
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 3100
+    annotations: {}
+
+  # Structured configuration - ONLY use this for single binary mode
+  structuredConfig:
+    auth_enabled: false
+
+    server:
+      http_listen_address: 0.0.0.0
+      http_listen_port: 3100
+
+    # Disable replication for single binary
+    memberlist:
+      join_members: []
+
+    ingester:
+      lifecycler:
+        address: 127.0.0.1
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
+      chunk_idle_period: 1h
+      max_chunk_age: 1h
+      chunk_target_size: 1048576
+
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /loki/boltdb-shipper-active
+        cache_location: /loki/boltdb-shipper-cache
+        shared_store: filesystem
+      filesystem:
+        directory: /loki/chunks
+
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+
+    chunk_store_config:
+      max_look_back_period: 0s
+
+    table_manager:
+      retention_deletes_enabled: false
+      retention_period: 0s
+
+    compactor:
+      working_directory: /loki/compactor
+      shared_store: filesystem
+
+# Fluent Bit Configuration for Minikube
+fluentbit:
+  enabled: true
+
+  # DaemonSet, Deployment or StatefulSet
+  kind: "DaemonSet"
+
+  image:
+    repository: "fluent/fluent-bit"
+    tag: "2.2.2"
+    pullPolicy: "IfNotPresent"
+
+  serviceAccount:
+    create: true
+
+  rbac:
+    create: true
+
+  # Resources - reduced for Minikube
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+    requests:
+      cpu: 50m
+      memory: 50Mi
+
+  tolerations:
+    - operator: Exists
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  # Add additional volumes
+  extraVolumes:
+    - name: varlog
+      hostPath:
+        path: /var/log
+    - name: varlibdockercontainers
+      hostPath:
+        path: /var/lib/docker/containers
+
+  # Add additional volume mounts
+  extraVolumeMounts:
+    - name: varlog
+      mountPath: /var/log
+      readOnly: true
+    - name: varlibdockercontainers
+      mountPath: /var/lib/docker/containers
+      readOnly: true

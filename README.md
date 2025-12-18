@@ -128,11 +128,17 @@ curl http://localhost:8002/health
 ### 6. Deploy Monitoring Stack
 
 ```bash
+# Add dependencies (if they dont yet exit)
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+helm dependency update
+
 # Install Prometheus and Grafana
-helm install monitoring infrastructure/helm/monitoring \
+helm install monitoring infrastructure/deployments/monitoring \
   --namespace monitoring \
   --create-namespace \
-  --values infrastructure/helm/monitoring/values-minikube.yaml
+  --values infrastructure/deploments/monitoring/values-minikube.yaml
 
 # Or upgrade if already installed
 helm upgrade monitoring infrastructure/helm/monitoring \
@@ -147,14 +153,23 @@ helm upgrade monitoring infrastructure/helm/monitoring \
 kubectl port-forward -n monitoring svc/monitoring-prometheus-server 9090:80
 # Open: http://localhost:9090
 
+# Check Prometheus targets
+# Open: http://localhost:9090/targets
+# Verify all services are "UP"
+
 # Port forward for Grafana
 kubectl port-forward -n monitoring svc/monitoring-grafana 3000:3000
 # Open: http://localhost:3000
 # Login: admin / admin123
+# 2 dahsboards form infrastructure/monitoring/dashboards shouls be loaded
+# Create the alert rule by importing the json at infrastructure/monitoring/alerts
 
-# Check Prometheus targets
-# Open: http://localhost:9090/targets
-# Verify all services are "UP"
+# Port forward for Loki
+kubectl port-forward svc/monitoring-loki 3100:3100 -n monitoring
+# Test labels:
+# curl http://localhost:3100/loki/api/v1/labels
+
+
 ```
 
 ## Development Workflow

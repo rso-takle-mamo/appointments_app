@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  # API Dashboard - loaded from dashboards/api_dashboard_clean.json
+  api_dashboard.json: |-
+{{ .Files.Get "dashboards/api_dashboard_clean.json" | nindent 4 }}
+  # Appointments App Logs Dashboard
+  logs_dashboard.json: |-
+{{ .Files.Get "dashboards/logs_dashboard_clean.json" | nindent 4 }}

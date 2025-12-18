@@ -1,0 +1,90 @@
+﻿apiVersion: 1
+groups:
+  - orgId: 1
+    name: Group
+    folder: Rules
+    interval: 10m
+    rules:
+      - uid: de893d2b-c4d1-4fb1-bf89-a23e7d90744b
+        title: Alert exceptions
+        condition: C
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: P8E80F9AEF21F6940
+            model:
+              datasource:
+                type: loki
+                uid: P8E80F9AEF21F6940
+              editorMode: builder
+              expr: count by(container) (rate({namespace="appointments-app"} |= `Exception:` [10m]))
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              queryType: instant
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 3
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations: {}
+        labels: {}
+        isPaused: false

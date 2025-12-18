@@ -1,0 +1,174 @@
+# Global settings
+global:
+  imagePullPolicy: IfNotPresent
+  environment: Development
+  namespace: appointments-app
+
+# Secrets
+secrets:
+  # In production, generate secure random keys and store them securely
+  jwtSecretKey: "M2RiNzY4MGEwOWQ1N2UzNTRkOTUxM2U2MGE2ZmJlNzkzNzY4Y2ZlZWQ1MTBlOGE5MmZlZWM4MDlhM2UzMjE1Yw=="  # Base64 encoded default key
+  vatcheckApiKey: "dmF0X2xpdmUwSng3aktRZ04wNEMyTzlkYlllNThMeWhYVEV0SkpqeEw5cHF3akdQ"  # Base64 encoded test key
+
+# PostgreSQL
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16"
+  port: 5432
+  admin:
+    username: postgres
+    password: "adminpassword"  # In production, use a secret or generate randomly
+  storage:
+    size: 5Gi
+    accessMode: ReadWriteOnce
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  config:
+    maxConnections: 200
+    sharedBuffers: 256MB
+    effectiveCacheSize: 1GB
+  init:
+    enabled: true  # Enable database and user initialization
+
+# Services configuration
+services:
+  user:
+    enabled: true
+    image: user-service:latest
+    replicas: 2
+    port: 8000
+    database:
+      name: userdb
+      user: userdb_user
+      password: userdb_password
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: user-database-migrator:latest
+      enabled: true
+
+  serviceCatalog:
+    enabled: true
+    image: service-catalog-service:latest
+    replicas: 2
+    port: 8000
+    database:
+      name: servicedb
+      user: servicedb_user
+      password: servicedb_password
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: service-catalog-database-migrator:latest
+      enabled: true
+
+  availability:
+    enabled: true
+    image: availability-service:latest
+    replicas: 2
+    port: 8000
+    database:
+      name: availabilitydb
+      user: availabilitydb_user
+      password: availabilitydb_password
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: availability-database-migrator:latest
+      enabled: true
+
+  booking:
+    enabled: true
+    image: booking-service:latest
+    replicas: 2
+    port: 8000
+    database:
+      name: bookingdb
+      user: bookingdb_user
+      password: bookingdb_password
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: booking-database-migrator:latest
+      enabled: true
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  host: localhost
+  paths:
+    auth: /api/auth
+    users: /api/users
+    tenants: /api/tenants
+    services: /api/services
+    categories: /api/categories
+    availability: /api/availability
+    bookings: /api/bookings
+
+# Migrations
+migrations:
+  enabled: true
+  targetMigration: ""  # Empty means latest
+  jobTtlSecondsAfterFinished: 3600  # 1 hour
+
+# Service discovery
+service:
+  type: ClusterIP
+
+# Common health probe settings
+healthProbes:
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  startup:
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30

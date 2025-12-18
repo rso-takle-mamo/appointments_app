@@ -1,0 +1,517 @@
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Prometheus Configuration
+prometheus:
+  enabled: true
+
+  # Prometheus Server
+  server:
+    enabled: true
+    image:
+      repository: prom/prometheus
+      tag: v2.45.0
+      pullPolicy: IfNotPresent
+
+    # Persistent storage
+    persistentVolume:
+      enabled: true
+      storageClass: "standard"
+      size: 20Gi
+
+    # Resources
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+    # Data retention
+    retention: 15d
+
+    # Configuration
+    config:
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+
+      rule_files:
+        - "/etc/prometheus/rules/*.yml"
+
+      scrape_configs:
+        # Kubernetes API Server
+        - job_name: 'kubernetes-apiservers'
+          kubernetes_sd_configs:
+            - role: endpoints
+          scheme: https
+          tls_config:
+            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+              action: keep
+              regex: default;kubernetes;https
+
+        # Node Exporter
+        - job_name: 'kubernetes-nodes'
+          kubernetes_sd_configs:
+            - role: node
+          relabel_configs:
+            - action: labelmap
+              regex: __meta_kubernetes_node_label_(.+)
+            - target_label: __address__
+              replacement: kubernetes.default.svc:443
+            - source_labels: [__meta_kubernetes_node_name]
+              regex: (.+)
+              target_label: __metrics_path__
+              replacement: /api/v1/nodes/${1}/proxy/metrics
+
+        # Kubelet
+        - job_name: 'kubernetes-kubelet'
+          kubernetes_sd_configs:
+            - role: node
+          relabel_configs:
+            - action: labelmap
+              regex: __meta_kubernetes_node_label_(.+)
+            - target_label: __address__
+              replacement: kubernetes.default.svc:443
+            - source_labels: [__meta_kubernetes_node_name]
+              regex: (.+)
+              target_label: __metrics_path__
+              replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+        # Kubernetes Services
+        - job_name: 'kubernetes-service-endpoints'
+          kubernetes_sd_configs:
+            - role: endpoints
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+              action: replace
+              target_label: __scheme__
+              regex: (https?)
+            - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+              action: replace
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_service_label_(.+)
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: kubernetes_namespace
+            - source_labels: [__meta_kubernetes_service_name]
+              action: replace
+              target_label: kubernetes_name
+
+        # Kubernetes Pods
+        - job_name: 'kubernetes-pods'
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+              action: replace
+              target_label: __scheme__
+              regex: (https?)
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              action: replace
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: kubernetes_namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              action: replace
+              target_label: kubernetes_pod_name
+
+    # Service for Prometheus
+    service:
+      type: ClusterIP
+      port: 9090
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+
+    # Ingress configuration
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      hosts:
+        - host: prometheus.localhost
+          paths:
+            - path: /
+              pathType: Prefix
+      tls: []
+
+  # Node Exporter
+  nodeExporter:
+    enabled: true
+    image:
+      repository: prom/node-exporter
+      tag: v1.6.1
+      pullPolicy: IfNotPresent
+
+    resources:
+      limits:
+        cpu: 200m
+        memory: 50Mi
+      requests:
+        cpu: 100m
+        memory: 30Mi
+
+    service:
+      port: 9100
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+
+  # Alert Manager
+  alertmanager:
+    enabled: false
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['alertname']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 1h
+        receiver: 'web.hook'
+      receivers:
+        - name: 'web.hook'
+          webhook_configs:
+            - url: 'http://127.0.0.1:5001/'
+
+# Grafana Configuration
+grafana:
+  enabled: true
+
+  image:
+    repository: grafana/grafana
+    tag: 10.2.0
+    pullPolicy: IfNotPresent
+
+  # Persistence
+  persistence:
+    enabled: true
+    storageClassName: "standard"
+    size: 10Gi
+
+  # Admin user
+  adminUser: admin
+  adminPassword: admin123
+
+  # Resources
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    hosts:
+      - grafana.localhost
+    paths:
+      - path: /
+        pathType: Prefix
+    tls: []
+
+  # Grafana configuration
+  grafana.ini:
+    server:
+      root_url: http://grafana.localhost
+    auth.anonymous:
+      enabled: false
+
+  # Data sources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://monitoring-prometheus-server.monitoring.svc.cluster.local:80
+          access: proxy
+          isDefault: true
+          editable: true
+        - name: Loki
+          type: loki
+          url: http://monitoring-loki.monitoring.svc.cluster.local:3100
+          access: proxy
+          isDefault: false
+          editable: true
+          jsonData:
+            maxLines: 1000
+
+  # Dashboard providers
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  # Sidecar configuration for loading dashboards
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /tmp/dashboards
+      searchNamespace: monitoring
+      provider:
+        allowUiUpdates: true
+        foldersFromFilesStructure: true
+      # Additional configuration for better visibility
+      defaultFolderName: "Appointments"
+
+# Service Monitor Configuration
+serviceMonitors:
+  enabled: true
+
+  # Service monitor for user service
+  userService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-user
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for service catalog service
+  serviceCatalogService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-servicecatalog
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for availability service
+  availabilityService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-availability
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+  # Service monitor for booking service
+  bookingService:
+    enabled: true
+    selector:
+      app.kubernetes.io/name: appointments-app-booking
+    namespace: appointments-app
+    endpoints:
+      - port: http
+        path: /metrics
+        interval: 15s
+
+# Loki Configuration
+loki:
+  enabled: true
+
+  # Loki image
+  image:
+    repository: grafana/loki
+    tag: 2.9.10
+    pullPolicy: IfNotPresent
+
+  # ServiceAccount configuration
+  serviceAccount:
+    create: true
+    annotations: {}
+
+  # Explicitly set deployment mode
+  deploymentMode: SingleBinary
+
+  # Use single binary mode for simplicity
+  singleBinary:
+    replicas: 1
+
+    # Persistent storage
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClassName: "standard"
+      accessModes:
+        - ReadWriteOnce
+
+    # Resources
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 3100
+    annotations: {}
+
+  # Structured configuration - ONLY use this for single binary mode
+  structuredConfig:
+    auth_enabled: false
+
+    server:
+      http_listen_address: 0.0.0.0
+      http_listen_port: 3100
+
+    # Disable clustering for single binary
+    memberlist:
+      join_members: []
+
+    ingester:
+      lifecycler:
+        address: 127.0.0.1
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
+      chunk_idle_period: 1h
+      max_chunk_age: 1h
+      chunk_target_size: 1048576
+
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /loki/boltdb-shipper-active
+        cache_location: /loki/boltdb-shipper-cache
+        shared_store: filesystem
+      filesystem:
+        directory: /loki/chunks
+
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+
+    chunk_store_config:
+      max_look_back_period: 0s
+
+    table_manager:
+      retention_deletes_enabled: false
+      retention_period: 0s
+
+    compactor:
+      working_directory: /loki/compactor
+      shared_store: filesystem
+
+# Fluent Bit Configuration
+fluentbit:
+  enabled: true
+
+  # DaemonSet, Deployment or StatefulSet
+  kind: "DaemonSet"
+
+  image:
+    repository: "fluent/fluent-bit"
+    tag: "2.2.2"
+    pullPolicy: "IfNotPresent"
+
+  serviceAccount:
+    create: true
+
+  rbac:
+    create: true
+
+  # Resources
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+  # Node selector
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  # Tolerations to run on all nodes
+  tolerations:
+    - operator: Exists
+
+  # Add additional volumes
+  extraVolumes:
+    - name: varlog
+      hostPath:
+        path: /var/log
+    - name: varlibdockercontainers
+      hostPath:
+        path: /var/lib/docker/containers
+
+  # Add additional volume mounts
+  extraVolumeMounts:
+    - name: varlog
+      mountPath: /var/log
+      readOnly: true
+    - name: varlibdockercontainers
+      mountPath: /var/lib/docker/containers
+      readOnly: true
+
+# Common configuration
+common:
+  labels: {}
+  annotations: {}
