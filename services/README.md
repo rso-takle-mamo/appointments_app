@@ -1,1 +1,1 @@
-﻿Services repos should be clone into this (/services) folder
+﻿Service repos should be cloned into this folder ([services](/services)).
