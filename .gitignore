@@ -128,3 +128,10 @@ logs/
 *.temp
 *.bak
 *.cache
+
+# Services repos
+services/availability-service
+services/booking-service
+services/notification-service
+services/service-catalog-service
+services/user-service
