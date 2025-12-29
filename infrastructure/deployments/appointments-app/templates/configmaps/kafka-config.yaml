@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+  namespace: {{ .Values.global.namespace }}
+data:
+  # Connection settings
+  bootstrap.servers: {{ .Values.kafka.bootstrapServers | quote }}
+
+  # Topics - centralized source of truth
+  topics.user-events: {{ .Values.kafka.topics.userEvents | quote }}
+  topics.tenant-events: {{ .Values.kafka.topics.tenantEvents | quote }}
+
+  # Producer settings
+  producers.acks: {{ .Values.kafka.producers.acks | quote }}
+  producers.enableIdempotence: {{ .Values.kafka.producers.enableIdempotence | quote }}
+  producers.messageTimeoutMs: {{ .Values.kafka.producers.messageTimeoutMs | quote }}
+  producers.requestTimeoutMs: {{ .Values.kafka.producers.requestTimeoutMs | quote }}
+
+  # Consumer settings
+  consumers.enableAutoCommit: {{ .Values.kafka.consumers.enableAutoCommit | quote }}
+  consumers.autoOffsetReset: {{ .Values.kafka.consumers.autoOffsetReset | quote }}

@@ -1,6 +1,6 @@
 # Appointment reservation system
 
-- [x] **Zunanji API**
+- [x] **External API**
   - Vatcheckapi: https://vatcheckapi.com/
   - Checking VAT number on provider registration, so only registered companies are allowed to register.
 
@@ -11,6 +11,9 @@
 
 
 - [x] **Metrics with Prometheus + Grafana**
+
+
+- [x] **Centralized logs: fluent bit -> loki -> grafana**
 
 
 ## Minikube Environment
@@ -40,35 +43,67 @@ docker build -t user-service:latest -f services/user-service/src/UserService.Api
 docker build -t service-catalog-service:latest -f services/service-catalog-service/src/ServiceCatalogService.Api/Dockerfile services/service-catalog-service/src --no-cache
 docker build -t availability-service:latest -f services/availability-service/src/AvailabilityService.Api/Dockerfile services/availability-service/src --no-cache
 docker build -t booking-service:latest -f services/booking-service/src/BookingService.Api/Dockerfile services/booking-service/src --no-cache
+docker build -t notification-service:latest -f services/notification-service/src/NotificationService.Api/Dockerfile services/notification-service/src --no-cache
 
 # Build migrator images from root
 docker build -t user-database-migrator:latest -f services/user-service/src/UserService.DatabaseMigrator/Dockerfile services/user-service/src --no-cache
 docker build -t service-catalog-database-migrator:latest -f services/service-catalog-service/src/ServiceCatalogService.DatabaseMigrator/Dockerfile services/service-catalog-service/src --no-cache
 docker build -t availability-database-migrator:latest -f services/availability-service/src/AvailabilityService.DatabaseMigrator/Dockerfile services/availability-service/src --no-cache
 docker build -t booking-database-migrator:latest -f services/booking-service/src/BookingService.DatabaseMigrator/Dockerfile services/booking-service/src --no-cache
+docker build -t notification-database-migrator:latest -f services/notification-service/src/NotificationService.DatabaseMigrator/Dockerfile services/notification-service/src --no-cache
 
 # Verify built images
-docker images | grep -E "(user|availability|booking|service-catalog)"
+docker images | grep -E "(user|availability|booking|service-catalog|notification)"
 ```
+
+### 3. Deploy Kafka (Event Streaming)
+
+Kafka is required for inter-service communication:
+- **user-events** → customer registration events
+- **tenant-events** → tenant updates
+- **provider-events** → provider registration (user + tenant atomically)
+
+```bash
+# Deploy Kafka (Helm command)
+helm upgrade --install kafka ./infrastructure/deployments/kafka \
+  --namespace kafka \
+  --create-namespace \
+  --values ./infrastructure/deployments/kafka/values-minikube.yaml
+
+# Or use the deployment script
+cd infrastructure/scripts
+./deploy-kafka.sh
+
+# Verify Kafka is running
+kubectl get pods -n kafka
+
+# Wait for Kafka to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kafka -n kafka --timeout=300s
+```
+
+Expected topics:
+- `user-events`
+- `tenant-events`
+- `provider-events`
 
 ## Deployment
 
-### 3. Deploy the Application Stack
+### 4. Deploy the Application Stack
 
 ```bash
 # Deploy with migrations enabled
-helm upgrade --install appointments-app ./infrastructure/helm \
+helm upgrade --install appointments-app ./infrastructure/deployments/appointments-app \
   --namespace appointments-app \
   --create-namespace \
-  --values ./infrastructure/helm/values-minikube.yaml
+  --values ./infrastructure/deployments/appointments-app/values-minikube.yaml
 
 # Alternative: If already installed, use upgrade instead
-helm upgrade appointments-app ./infrastructure/helm \
+helm upgrade appointments-app ./infrastructure/deployments/appointments-app \
   --namespace appointments-app \
-  --values ./infrastructure/helm/values-minikube.yaml
+  --values ./infrastructure/deployments/appointments-app/values-minikube.yaml
 ```
 
-### 4. Verify Deployment
+### 5. Verify Deployment
 
 ```bash
 # Check all pods
@@ -89,7 +124,7 @@ kubectl get ingress -n appointments-app
 
 ## Accessing the Services
 
-### 5. Access Your Applications
+### 6. Access Your Applications
 
 #### Option A: Via Ingress (Recommended)
 
@@ -102,6 +137,7 @@ kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80
 # Service Catalog: http://localhost:8080/api/services
 # Availability: http://localhost:8080/api/availability
 # Booking: http://localhost:8080/api/bookings
+# Notification: has not external API endpoints
 ```
 
 #### Option B: Direct Port Forwarding
@@ -125,7 +161,7 @@ curl http://localhost:8002/health
 
 ## Monitoring with Prometheus & Grafana
 
-### 6. Deploy Monitoring Stack
+### 7. Deploy Monitoring Stack
 
 ```bash
 # Add dependencies (if they dont yet exit)
@@ -146,7 +182,7 @@ helm upgrade monitoring infrastructure/helm/monitoring \
   --values infrastructure/helm/monitoring/values-minikube.yaml
 ```
 
-### 7. Access Monitoring Tools
+### 8. Access Monitoring Tools
 
 ```bash
 # Port forward for Prometheus
@@ -241,6 +277,10 @@ kubectl port-forward -n appointments-app svc/<service-name> <local-port>:<servic
 ### Cleaning Up
 
 ```bash
+# Delete Kafka
+helm uninstall kafka -n kafka
+kubectl delete namespace kafka --wait
+
 # Delete application
 helm uninstall appointments-app -n appointments-app
 kubectl delete namespace appointments-app --wait

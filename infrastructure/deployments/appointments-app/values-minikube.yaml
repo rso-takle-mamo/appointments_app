@@ -22,7 +22,7 @@ secrets:
   jwtSecretKey: "M2RiNzY4MGEwOWQ1N2UzNTRkOTUxM2U2MGE2ZmJlNzkzNzY4Y2ZlZWQ1MTBlOGE5MmZlZWM4MDlhM2UzMjE1Yw=="
   # Vatcheck API Key (base64 encoded)
   # Original: vat_live_0Jx7jKQgN04C2O9dbZe58LyhXTEtJJ6xL9pqwjGP
-  vatcheckApiKey: "dmF0X2xpdmUwSng3aktRZ04wNEMyTzlkYlllNThMeWhYVEV0SkpqeEw5cHF3akdQ"
+  vatcheckApiKey: "dmF0X2xpdmVfMEp4N2pLUWdOMDRDMk85ZGJaZTU4THloWFRFdEpKNnhMOXBxd2pHUA=="
 
 # PostgreSQL
 postgresql:
@@ -51,6 +51,21 @@ postgresql:
     effectiveCacheSize: 256MB
   init:
     enabled: false  # Enable database initialization - create only databases and users
+
+# Kafka configuration
+kafka:
+  bootstrapServers: "kafka.kafka:9092"
+  topics:
+    userEvents: "user-events"
+    tenantEvents: "tenant-events"
+  producers:
+    acks: "all"
+    enableIdempotence: "true"
+    messageTimeoutMs: "5000"
+    requestTimeoutMs: "3000"
+  consumers:
+    enableAutoCommit: "false"
+    autoOffsetReset: "earliest"
 
 # Services configuration - optimized for Minikube
 services:
@@ -144,6 +159,29 @@ services:
       readinessPath: /health/ready
     migration:
       image: booking-database-migrator:latest
+      enabled: true
+
+  notification:
+    enabled: true
+    image: notification-service:latest
+    replicas: 2
+    port: 8000
+    database:
+      name: notificationdb
+      user: notificationdb_user
+      password: notificationdb_password
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "250m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: notification-database-migrator:latest
       enabled: true
 
 # Ingress configuration for Minikube

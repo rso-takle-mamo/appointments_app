@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-create-topics
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: topics-job
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-topics
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              echo "Waiting for Kafka to be reachable..."
+              sleep 15
+
+              BOOTSTRAP_SERVER="kafka.{{ .Values.namespace.name }}.svc.cluster.local:9092"
+
+              {{- range .Values.topics }}
+              echo "Creating topic {{ .name }} (if not exists)"
+              /opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server ${BOOTSTRAP_SERVER} \
+                --create \
+                --if-not-exists \
+                --topic {{ .name }} \
+                --partitions {{ .partitions }} \
+                --replication-factor {{ .replicationFactor }}
+              {{- end }}
+
+              echo "Topic creation completed."

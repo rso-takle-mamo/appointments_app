@@ -1,6 +1,46 @@
 version: '3.8'
 
 services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: appointments-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - appointments-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: appointments-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    ports:
+      - "9093:9092"
+    networks:
+      - appointments-network
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: appointments-kafka-ui
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    ports:
+      - "8080:8080"
+    networks:
+      - appointments-network
+
   postgres:
     image: postgres:16
     container_name: appointments-postgres
@@ -32,11 +72,17 @@ services:
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${USER_DB_NAME};Username=${USER_DB_USERNAME};Password=${USER_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - VATCHECK_API_KEY=${VATCHECK_API_KEY}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_CLIENT_ID=user-service
+      - KAFKA_USER_EVENTS_TOPIC=user-events
+      - KAFKA_TENANT_EVENTS_TOPIC=tenant-events
     ports:
       - "8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - appointments-network
     restart: unless-stopped
@@ -155,6 +201,47 @@ services:
       - DATABASE_USERNAME=${BOOKING_DB_USERNAME}
       - DATABASE_PASSWORD=${BOOKING_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    profiles:
+      - migration
+    networks:
+      - appointments-network
+
+  notification-service:
+    build:
+      context: ./services/notification-service/src
+      dockerfile: NotificationService.Api/Dockerfile
+    container_name: appointments-notification-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8000
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${NOTIFICATION_DB_NAME};Username=${NOTIFICATION_DB_USERNAME};Password=${NOTIFICATION_DB_PASSWORD}
+      - KAFKA__BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA__CLIENTID=notification-service
+      - KAFKA__USEREVENTSTOPIC=user-events
+      - KAFKA__TENANTEVENTSTOPIC=tenant-events
+      - KAFKA__CONSUMERGROUPID=notification-service
+      - KAFKA__ENABLEAUTOCOMMIT=false
+      - KAFKA__AUTOOFFSETRESET=Earliest
+    ports:
+      - "8005:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - appointments-network
+    restart: unless-stopped
+
+  notification-service-migrator:
+    build:
+      context: ./services/notification-service/src
+      dockerfile: NotificationService.DatabaseMigrator/Dockerfile
+    container_name: appointments-notification-migrator
+    environment:
+      - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${NOTIFICATION_DB_NAME};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - DATABASE_USERNAME=${NOTIFICATION_DB_USERNAME}
+      - DATABASE_PASSWORD=${NOTIFICATION_DB_PASSWORD}
     profiles:
       - migration
     networks:

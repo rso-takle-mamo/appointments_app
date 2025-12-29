@@ -37,6 +37,21 @@ postgresql:
   init:
     enabled: true  # Enable database and user initialization
 
+# Kafka configuration
+kafka:
+  bootstrapServers: "kafka.kafka:9092"
+  topics:
+    userEvents: "user-events"
+    tenantEvents: "tenant-events"
+  producers:
+    acks: "all"
+    enableIdempotence: "true"
+    messageTimeoutMs: "5000"
+    requestTimeoutMs: "3000"
+  consumers:
+    enableAutoCommit: "false"
+    autoOffsetReset: "earliest"
+
 # Services configuration
 services:
   user:
@@ -129,6 +144,29 @@ services:
       readinessPath: /health/ready
     migration:
       image: booking-database-migrator:latest
+      enabled: true
+
+  notification:
+    enabled: true
+    image: notification-service:latest
+    replicas: 2
+    port: 8000
+    database:
+      name: notificationdb
+      user: notificationdb_user
+      password: notificationdb_password
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: notification-database-migrator:latest
       enabled: true
 
 # Ingress configuration

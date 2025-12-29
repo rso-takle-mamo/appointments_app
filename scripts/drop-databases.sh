@@ -1,2 +1,0 @@
-﻿kubectl exec -it $(kubectl get pods -l app=shared-postgresql -n appointments-app -o jsonpath='{.items[0].metadata.name}') -n appointments-app -- psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS userdb;"
-kubectl exec -it $(kubectl get pods -l app=shared-postgresql -n appointments-app -o jsonpath='{.items[0].metadata.name}') -n appointments-app -- psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS servicecatalogdb;"
