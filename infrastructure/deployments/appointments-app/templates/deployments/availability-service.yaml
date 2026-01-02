@@ -89,6 +89,33 @@ spec:
             secretKeyRef:
               name: {{ include "appointments-app.fullname" . }}-secrets
               key: jwt-secret-key
+        - name: KAFKA__BOOTSTRAPSERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: bootstrap.servers
+        - name: KAFKA__TENANTEVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.tenant-events
+        - name: KAFKA__BOOKINGEVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.booking-events
+        - name: KAFKA__CONSUMERGROUPID
+          value: "availability-service"
+        - name: KAFKA__ENABLEAUTOCOMMIT
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: consumers.enableAutoCommit
+        - name: KAFKA__AUTOOFFSETRESET
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: consumers.autoOffsetReset
         resources:
           {{- toYaml .Values.services.availability.resources | nindent 10 }}
         livenessProbe:

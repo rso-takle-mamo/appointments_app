@@ -109,6 +109,13 @@ spec:
             configMapKeyRef:
               name: kafka-config
               key: topics.tenant-events
+        - name: KAFKA__PROVIDEREVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.provider-events
+        - name: KAFKA__CLIENTID
+          value: "user-service"
         resources:
           {{- toYaml .Values.services.user.resources | nindent 10 }}
         livenessProbe:

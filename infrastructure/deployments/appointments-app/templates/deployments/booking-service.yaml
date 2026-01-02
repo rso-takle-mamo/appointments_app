@@ -89,7 +89,7 @@ spec:
             secretKeyRef:
               name: {{ include "appointments-app.fullname" . }}-secrets
               key: jwt-secret-key
-        - name: AVAILABILITY_SERVICE_GRPC_URL
+        - name: AvailabilityServiceGrpc__Url
           valueFrom:
             secretKeyRef:
               name: {{ include "appointments-app.fullname" . }}-secrets
@@ -99,6 +99,60 @@ spec:
             secretKeyRef:
               name: {{ include "appointments-app.fullname" . }}-secrets
               key: vatcheck-api-key
+        - name: KAFKA__BOOTSTRAPSERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: bootstrap.servers
+        - name: KAFKA__TENANTEVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.tenant-events
+        - name: KAFKA__SERVICECATALOGEVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.service-catalog-events
+        - name: KAFKA__BOOKINGEVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.booking-events
+        - name: KAFKA__CLIENTID
+          value: "booking-service"
+        - name: KAFKA__CONSUMERGROUPID
+          value: "booking-service"
+        - name: KAFKA__ENABLEAUTOCOMMIT
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: consumers.enableAutoCommit
+        - name: KAFKA__AUTOOFFSETRESET
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: consumers.autoOffsetReset
+        - name: KAFKA__ACKS
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: producers.acks
+        - name: KAFKA__ENABLEIDEMPOTENCE
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: producers.enableIdempotence
+        - name: KAFKA__MESSAGETIMEOUTMS
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: producers.messageTimeoutMs
+        - name: KAFKA__REQUESTTIMEOUTMS
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: producers.requestTimeoutMs
         resources:
           {{- toYaml .Values.services.booking.resources | nindent 10 }}
         livenessProbe:

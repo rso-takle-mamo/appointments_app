@@ -10,6 +10,9 @@ data:
   # Topics - centralized source of truth
   topics.user-events: {{ .Values.kafka.topics.userEvents | quote }}
   topics.tenant-events: {{ .Values.kafka.topics.tenantEvents | quote }}
+  topics.provider-events: {{ .Values.kafka.topics.providerEvents | quote }}
+  topics.service-catalog-events: {{ .Values.kafka.topics.serviceCatalogEvents | quote }}
+  topics.booking-events: {{ .Values.kafka.topics.bookingEvents | quote }}
 
   # Producer settings
   producers.acks: {{ .Values.kafka.producers.acks | quote }}

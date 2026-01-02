@@ -37,7 +37,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     ports:
-      - "8080:8080"
+      - "8090:8080"
     networks:
       - appointments-network
 
@@ -112,11 +112,22 @@ services:
       - ASPNETCORE_URLS=http://+:8000
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${SERVICE_DB_NAME};Username=${SERVICE_DB_USERNAME};Password=${SERVICE_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - KAFKA__BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA__CLIENTID=service-catalog-service
+      - KAFKA__TENANT_EVENTS_TOPIC=tenant-events
+      - KAFKA__SERVICECATALOGEVENTSTOPIC=service-catalog-events
+      - KAFKA__CONSUMERGROUPID=service-catalog-service
+      - KAFKA__ENABLEAUTOCOMMIT=false
+      - KAFKA__AUTOOFFSETRESET=earliest
+      - KAFKA__ACKS=all
+      - KAFKA__ENABLEIDEMPOTENCE=true
     ports:
       - "8002:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - appointments-network
     restart: unless-stopped
@@ -146,6 +157,12 @@ services:
       - ASPNETCORE_URLS=http://+:8000;http://+:5001
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${AVAILABILITY_DB_NAME};Username=${AVAILABILITY_DB_USERNAME};Password=${AVAILABILITY_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - KAFKA__BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA__TENANTEVENTSTOPIC=tenant-events
+      - KAFKA__BOOKINGEVENTSTOPIC=booking-events
+      - KAFKA__CONSUMERGROUPID=availability-service
+      - KAFKA__ENABLEAUTOCOMMIT=false
+      - KAFKA__AUTOOFFSETRESET=earliest
     ports:
       - "8003:8000"
       - "5001:5001"  # gRPC port
@@ -182,11 +199,23 @@ services:
       - DATABASE_CONNECTION_STRING=Host=postgres;Port=5432;Database=${BOOKING_DB_NAME};Username=${BOOKING_DB_USERNAME};Password=${BOOKING_DB_PASSWORD}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - AvailabilityServiceGrpc__Url=${AVAILABILITY_SERVICE_GRPC_URL}
+      - KAFKA__BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA__CLIENTID=booking-service
+      - KAFKA__TENANT_EVENTS_TOPIC=tenant-events
+      - KAFKA__SERVICECATALOGEVENTSTOPIC=service-catalog-events
+      - KAFKA__BOOKINGEVENTSTOPIC=booking-events
+      - KAFKA__CONSUMERGROUPID=booking-service
+      - KAFKA__ENABLEAUTOCOMMIT=false
+      - KAFKA__AUTOOFFSETRESET=earliest
+      - KAFKA__ACKS=all
+      - KAFKA__ENABLEIDEMPOTENCE=true
     ports:
       - "8004:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - appointments-network
     restart: unless-stopped
@@ -219,6 +248,8 @@ services:
       - KAFKA__CLIENTID=notification-service
       - KAFKA__USEREVENTSTOPIC=user-events
       - KAFKA__TENANTEVENTSTOPIC=tenant-events
+      - KAFKA__PROVIDEREVENTSTOPIC=provider-events
+      - KAFKA__BOOKINGEVENTSTOPIC=booking-events
       - KAFKA__CONSUMERGROUPID=notification-service
       - KAFKA__ENABLEAUTOCOMMIT=false
       - KAFKA__AUTOOFFSETRESET=Earliest

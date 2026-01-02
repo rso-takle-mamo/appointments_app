@@ -99,6 +99,16 @@ spec:
             configMapKeyRef:
               name: kafka-config
               key: topics.tenant-events
+        - name: KAFKA__PROVIDEREVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.provider-events
+        - name: KAFKA__BOOKINGEVENTSTOPIC
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: topics.booking-events
         - name: KAFKA__CONSUMERGROUPID
           value: "notification-service"
         - name: KAFKA__ENABLEAUTOCOMMIT

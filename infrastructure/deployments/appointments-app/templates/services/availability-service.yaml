@@ -17,6 +17,10 @@ spec:
     targetPort: {{ .Values.services.availability.port }}
     protocol: TCP
     name: http
+  - port: 5001
+    targetPort: 5001
+    protocol: TCP
+    name: grpc
   selector:
     {{- include "appointments-app.service.selectorLabels" (dict "context" . "name" "availability") | nindent 4 }}
 {{- end }}

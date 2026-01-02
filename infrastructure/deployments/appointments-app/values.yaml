@@ -39,10 +39,13 @@ postgresql:
 
 # Kafka configuration
 kafka:
-  bootstrapServers: "kafka.kafka:9092"
+  bootstrapServers: "kafka.kafka.svc.cluster.local:9092"
   topics:
     userEvents: "user-events"
     tenantEvents: "tenant-events"
+    providerEvents: "provider-events"
+    serviceCatalogEvents: "service-catalog-events"
+    bookingEvents: "booking-events"
   producers:
     acks: "all"
     enableIdempotence: "true"

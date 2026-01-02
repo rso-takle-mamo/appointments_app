@@ -81,11 +81,6 @@ kubectl get pods -n kafka
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kafka -n kafka --timeout=300s
 ```
 
-Expected topics:
-- `user-events`
-- `tenant-events`
-- `provider-events`
-
 ## Deployment
 
 ### 4. Deploy the Application Stack
@@ -157,6 +152,15 @@ curl http://localhost:8002/health
 # Swagger UI:
 # http://localhost:8001/swagger
 # http://localhost:8002/swagger
+```
+
+#### Access the db locally
+```bash
+# Port forward the database - (keep shell open)
+kubectl port-forward -n appointments-app deployments/appointments-app-postgresql 5432:5432
+
+# Connection string for user service:
+# Host=localhost;Port=5432;Database=userdb;Username=userdb_user;Password=userdb_password
 ```
 
 ## Monitoring with Prometheus & Grafana

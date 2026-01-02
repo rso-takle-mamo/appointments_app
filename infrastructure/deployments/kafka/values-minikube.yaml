@@ -45,6 +45,12 @@ topics:
   - name: tenant-events
     partitions: 1
     replicationFactor: 1
+  - name: service-catalog-events
+    partitions: 1
+    replicationFactor: 1
+  - name: booking-events
+    partitions: 1
+    replicationFactor: 1
 
 # -----------------------
 # Persistence
