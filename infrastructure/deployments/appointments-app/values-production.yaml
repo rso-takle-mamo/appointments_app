@@ -38,6 +38,8 @@ kafka:
   bootstrapServers: "appointments-eventhubs.servicebus.windows.net:9093"
   securityProtocol: "SASL_SSL"
   saslMechanism: "PLAIN"
+  saslUsername: "RootManageSharedAccessKey"
+  saslPassword: ""
   topics:
     userEvents: "user-events"
     tenantEvents: "tenant-events"
@@ -66,11 +68,11 @@ services:
       password: "8bs2wxwP7ibrcWUL"
     resources:
       requests:
-        memory: "512Mi"
-        cpu: "250m"
+        memory: "256Mi"
+        cpu: "100m"
       limits:
-        memory: "1Gi"
-        cpu: "500m"
+        memory: "512Mi"
+        cpu: "300m"
     health:
       livenessPath: /health/live
       readinessPath: /health/ready
@@ -89,11 +91,11 @@ services:
       password: "CXs58LJpj63f3NnP"
     resources:
       requests:
-        memory: "512Mi"
-        cpu: "250m"
+        memory: "256Mi"
+        cpu: "100m"
       limits:
-        memory: "1Gi"
-        cpu: "500m"
+        memory: "512Mi"
+        cpu: "300m"
     health:
       livenessPath: /health/live
       readinessPath: /health/ready
@@ -112,11 +114,11 @@ services:
       password: "qmf0r7ue9icVpz5O"
     resources:
       requests:
-        memory: "512Mi"
-        cpu: "250m"
+        memory: "256Mi"
+        cpu: "100m"
       limits:
-        memory: "1Gi"
-        cpu: "500m"
+        memory: "512Mi"
+        cpu: "300m"
     health:
       livenessPath: /health/live
       readinessPath: /health/ready
@@ -135,11 +137,11 @@ services:
       password: "8Lw5N3TD46K1QiUz"
     resources:
       requests:
-        memory: "512Mi"
-        cpu: "250m"
+        memory: "256Mi"
+        cpu: "100m"
       limits:
-        memory: "1Gi"
-        cpu: "500m"
+        memory: "512Mi"
+        cpu: "300m"
     health:
       livenessPath: /health/live
       readinessPath: /health/ready
@@ -170,7 +172,7 @@ services:
       image: appointmentsapp.azurecr.io/notification-database-migrator:0.1.0
       enabled: true
 
-# Ingress configuration for NGINX Ingress Controller
+# Ingress configuration for Azure Application Routing
 ingress:
   enabled: true
   className: webapprouting.kubernetes.azure.com
@@ -183,9 +185,13 @@ ingress:
     categories: /api/categories
     availability: /api/availability
     bookings: /api/bookings
-  annotations: {}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
   tls:
-    enabled: false
+    enabled: true
+    secretName: "appointments-app-tls"
+    crt: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tDQpNSUlEVVRDQ0FqbWdBd0lCQWdJVVVqOTlOb1h2cnpVelcxR3pKZEhJZ04vS3Jvc3dEUVlKS29aSWh2Y05BUUVMDQpCUUF3T0RFYk1Ca0dBMVVFQXd3U05DNHhOalV1TVRjMkxqY3VibWx3TG1sdk1Sa3dGd1lEVlFRS0RCQmhjSEJ2DQphVzUwYldWdWRITXRZWEJ3TUI0WERUSTJNREV4TVRFM01qY3hObG9YRFRJM01ERXhNVEUzTWpjeE5sb3dPREViDQpNQmtHQTFVRUF3d1NOQzR4TmpVdU1UYzJMamN1Ym1sd0xtbHZNUmt3RndZRFZRUUtEQkJoY0hCdmFXNTBiV1Z1DQpkSE10WVhCd01JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBcjJNb2FjdnprZDUrDQpucVhRWG04WURpSzlmWEEvSXZidlFYOU5jaitHOFF5NUR1SzRCdXZ4UTE2dHlyckNWTTJIOVFDeXlNUUo2SlhzDQpRVTYrR1lGYzlHZHRNSG5ndVBNcGM1aFZPNm1MbG1BVHcycGZUenRtV1BOTHA5bVR1a3dNbkExTGc2MEVxSXQyDQo0WDBYcUgzZmk2N3NsNUtrSFhST0ZGQUpxSWhLdEgxK2M5Z2lkdCtMYVU0MDhocnZVMjVEcEhsdVM1RWlZL2d3DQpvcktkMHQ3ZGR3ZUNBSmljOTg1UHorM0JLNjZrSUJEdEpMdlJUY1NaNU5Cai9NNmhWVFNiNTM4THZHTHNjNkJjDQpXQmRyby9xRUVvZzB3K1F1QmxVZGtObFZxQmhoSTlnMGJsaDdiSnRwRGFiZ21JYnJzMlEyQ09WSlowOGpzOG1sDQpQdFF3b0VvVFp3SURBUUFCbzFNd1VUQWRCZ05WSFE0RUZnUVVnUjA2NUNrTUdvcGg5RG9zMWNoOExIL08yTnN3DQpId1lEVlIwakJCZ3dGb0FVZ1IwNjVDa01Hb3BoOURvczFjaDhMSC9PMk5zd0R3WURWUjBUQVFIL0JBVXdBd0VCDQovekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBV2VrSzRJZDNjZTdsOHc1T0FMQ1RtandDSXc3ZnBxWWRZKzNtDQozbVpWa1prNzZVbTNxWldoM1l4MExyRURyYWgwcmsvU0xjeHFWUmRuTkNldWEveDRMTTBJNnRBWHdUeTM0Nm5nDQpML3NkMkNaRHJ4YWVUaXNZTXRkUjlFcVFUZ256QTMrdXZmZHpYWElnWGtia1VCeS9wSjRUN0JURmd4OEhLRUt0DQp1V0FxdTZnS0RLRlZaUElOOE9JQmg5RWcvSElzVzYwSlo5Z3pxMG85cHJoVHdNLzBTZCtuaXFONk1DSnZOTGxYDQpWcU43UWcrODJuY21kOUFDditpYlMvUk5EZ2ZxSVZIbnhDWWFCMlRiY1pNSXlGOHoweDlXaE85aTRZOHhhQUxCDQpJWDBvZVFKN3Y2Y002OUU2RCtXSlB0OVVvU1NZUUd2TVhRcExnZlRJRXNkWFR6bHRXUT09DQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tDQo="
+    key: "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tDQpNSUlFdkFJQkFEQU5CZ2txaGtpRzl3MEJBUUVGQUFTQ0JLWXdnZ1NpQWdFQUFvSUJBUUN2WXlocHkvT1IzbjZlDQpwZEJlYnhnT0lyMTljRDhpOXU5QmYwMXlQNGJ4RExrTzRyZ0c2L0ZEWHEzS3VzSlV6WWYxQUxMSXhBbm9sZXhCDQpUcjRaZ1Z6MFoyMHdlZUM0OHlsem1GVTdxWXVXWUJQRGFsOVBPMlpZODB1bjJaTzZUQXljRFV1RHJRU29pM2JoDQpmUmVvZmQrTHJ1eVhrcVFkZEU0VVVBbW9pRXEwZlg1ejJDSjIzNHRwVGpUeUd1OVRia09rZVc1TGtTSmorRENpDQpzcDNTM3QxM0I0SUFtSnozemsvUDdjRXJycVFnRU8wa3U5Rk54Sm5rMEdQOHpxRlZOSnZuZnd1OFl1eHpvRnhZDQpGMnVqK29RU2lEVEQ1QzRHVlIyUTJWV29HR0VqMkRSdVdIdHNtMmtOcHVDWWh1dXpaRFlJNVVsblR5T3p5YVUrDQoxRENnU2hObkFnTUJBQUVDZ2dFQUdRdlJCcUxBaXRFNlJjK3FIUUpDYmlwWjR5TDNjVGZRWFFzZjlUUExRbnN0DQpwa21NUERqUGdHNXg1U1NjZ2QzRUQ2SGs1alRRc1cxUGl0Z0MzOE9Ra2JwL1prL1JYcmdpOEVZTnpmSmRZOEVlDQpzV1pzYS9Vd25YMUpEWlJOdTJvRzF2WXpGWC9NellEMUhpaHVDM3JHUkwxYlBoNEwzOFR2TFlsc2g2dkc5MVZFDQpBcXdrT3Q3M0svbElsLzhBd3Q2V0FSRFJxcm1sOWdoZXhjcCs1eDE5bkZhMmZLWStSdzlOVG5YNmF2UjVFUzhqDQpLaWFjTGVtUHkwNnY5M2FKNXp6MnpJS29HWmhuNUFlOUhOei8vbHVhMng0azdtWjlsOGo5SzlDZTNqM3VFaG5hDQpkU1A4OFZ2ZXJzUkZ1ZTZ0S0pDMFNBeWd1Tnp5RnQ2NCtuWEdIMmRKS1FLQmdRRFpSM3BoQmFlMkppalZyeC9sDQpLZjBkMFZLREVEeWNQQUZ3T0dTSkhJNTl3R0VrQUFSdTZSWmlNbVlMb2t4emJyajd3NFk5eGpLZXZ4QWc2a3Y1DQo5NkF4VlNOdGc3bERWbWlCdGFWUmVQV3pJWUkwRXJIek5xUnlaL2JuQnNoUEpPNjBSTzdOT0FZeGxTV1BQVE5UDQp2Rlh0SmNFN2s3b3BKa0VSWUdkN0tGVDRvd0tCZ1FET3BJWjh5UFpaRkduOGRDVkhwOXdUVU8xMDhPU2hUS0s2DQpPcDdySGt6MlUyQXU2dEFjOUE5NTZzdW9mYTNuVnlkb2srYTFJZTZwaDFXb2s1TzJWWHllTEt4TE1uQ1BsTjh5DQpxeVFZS1ZWNXNTQkN0VkNsbDFxSXVpbnhSZ05INklvRnJITlZmUzhOQUR2VHFabk9vMGE0QjluOHhaME1uSEk3DQo3RDZ2UVNoU2JRS0JnQVA3VkZuTTBicjd6Z25FY05BeFNjc3ZGOVVCQ2l0T3lqUDFSSnBpcEpYWFhiQmNNN2lZDQptdWxueFFqM2kzRWVHVk83ekl6N1FkZzQ1aUhFU1dvbVNKQSs0Q3hVbXFPS1JOWURyeWprRDVTZHk1WUt0YW9nDQpXVGtqZ0puUlBRQitTOFdQOGRSZTczWWZKcFlPYUE5anh5dFdZc2tsdHVha0pkTWNja2pHbjNBREFvR0FGZis3DQo5WkxyYndaV1ZqTURPUUtzMGoyZVdnRy9SVkRFVGpFcGMveHcweFNETzl0eHRuTmhKbWlScitsWlZ6U1hGSElTDQpjSndoTFZra0RHTlJxV3FtYnF4dzF6eVNjU2EzTUV5NTlmeUloZ0VPWHl1d1gwQ2l1Y1dmNjNpNXByRWg2SUs0DQpjSlI0S3Rrb2hWc2I3YnpDTFp0Z1lLR2xHNCtZTmJycjNYcUJVVzBDZ1lCTHBwMTAvQzVHSnk0UDFhMFlpZC90DQpyS2FmbFpFRy9tTVpRNmNoMVlicFdtYmYwNExqWldUUGlTTlVhSUVOdWVGN0t3eTVjWWs0S2UvMXl3dktLMVZyDQpBbFdka3FMVE1seS80SzNEWFYzWndqaUJ0bm1zSzhlcGl4SEFPMFNORSt1RUYrcjM4TUpTM1JIbmpYU0gxOXE3DQpYM0pEaXN3T2tNci9EVDc3QWVvZ3l3PT0NCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0NCg=="
 
 # Migrations
 migrations:

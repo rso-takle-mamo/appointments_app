@@ -6,8 +6,18 @@ metadata:
   namespace: {{ .Values.global.namespace }}
   labels:
     {{- include "appointments-app.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ingress.annotations }}
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.host | quote }}
+    secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "appointments-app.fullname" .)) }}
+  {{- end }}
   rules:
   - host: {{ .Values.ingress.host }}
     http:
