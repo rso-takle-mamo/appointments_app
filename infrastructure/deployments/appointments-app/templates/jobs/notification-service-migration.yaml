@@ -15,6 +15,7 @@ spec:
         {{- include "appointments-app.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: migration
     spec:
+      serviceAccountName: {{ include "appointments-app.serviceAccountName" . }}
       restartPolicy: Never
       containers:
       - name: migration-notification

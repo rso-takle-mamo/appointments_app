@@ -1,27 +1,19 @@
-# Minikube-specific values for Appointments App
+# Minikube-specific values for Appointments App - DEVELOPMENT environment
 
-# Global settings
 global:
   environment: Development
   namespace: appointments-app
-  imagePullPolicy: Never  # Use local images built in Minikube (required after running build-and-load-images.sh)
+  imagePullPolicy: Never  # Use local images built in Minikube context
 
-# Chart settings
 fullnameOverride: "appointments-app"
 nameOverride: ""
 
-# Service Account
 serviceAccount:
   create: false
   name: ""
 
-# Secrets configuration
 secrets:
-  # JWT Secret Key (base64 encoded)
-  # Original: 3db7680a09d57e354d9513e60a6fbe793768cfeed510e8a92feec809a3e3215c
   jwtSecretKey: "M2RiNzY4MGEwOWQ1N2UzNTRkOTUxM2U2MGE2ZmJlNzkzNzY4Y2ZlZWQ1MTBlOGE5MmZlZWM4MDlhM2UzMjE1Yw=="
-  # Vatcheck API Key (base64 encoded)
-  # Original: vat_live_0Jx7jKQgN04C2O9dbZe58LyhXTEtJJ6xL9pqwjGP
   vatcheckApiKey: "dmF0X2xpdmVfMEp4N2pLUWdOMDRDMk85ZGJaZTU4THloWFRFdEpKNnhMOXBxd2pHUA=="
 
 # PostgreSQL
@@ -34,25 +26,27 @@ postgresql:
   admin:
     username: postgres
     password: "adminpassword"
+  external:
+    enabled: false
   storage:
-    size: 2Gi  # Reduced size for Minikube
-    storageClass: "standard"  # Minikube's default storage class
+    size: 2Gi
+    storageClass: "standard"
     accessMode: ReadWriteOnce
   resources:
     requests:
-      memory: "256Mi"  # Reduced memory for Minikube
+      memory: "256Mi"
       cpu: "250m"
     limits:
-      memory: "512Mi"  # Reduced memory for Minikube
+      memory: "512Mi"
       cpu: "500m"
   config:
-    maxConnections: 100  # Reduced for Minikube
+    maxConnections: 100
     sharedBuffers: 128MB
     effectiveCacheSize: 256MB
   init:
-    enabled: false  # Enable database initialization - create only databases and users
+    enabled: false
 
-# Kafka configuration
+# Kafka configuration (local Kafka - no SASL)
 kafka:
   bootstrapServers: "kafka.kafka.svc.cluster.local:9092"
   topics:
@@ -70,7 +64,7 @@ kafka:
     enableAutoCommit: "false"
     autoOffsetReset: "earliest"
 
-# Services configuration - optimized for Minikube
+# Services configuration
 services:
   user:
     enabled: true
@@ -191,7 +185,7 @@ services:
 ingress:
   enabled: true
   className: nginx
-  host: ""  # Leave empty to use Minikube IP directly
+  host: ""
   paths:
     auth: /api/auth
     users: /api/users
@@ -205,16 +199,14 @@ ingress:
 migrations:
   enabled: true
   targetMigration: ""  # Empty means latest
-  jobTtlSecondsAfterFinished: 300  # 5 minutes
+  jobTtlSecondsAfterFinished: 300
 
-# Service discovery
 service:
   type: ClusterIP
 
-# Common health probe settings - adjusted for Minikube
 healthProbes:
   liveness:
-    initialDelaySeconds: 20  # Reduced for faster startup
+    initialDelaySeconds: 20
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
@@ -227,4 +219,4 @@ healthProbes:
     initialDelaySeconds: 0
     periodSeconds: 5
     timeoutSeconds: 5
-    failureThreshold: 20  # Reduced for Minikube
+    failureThreshold: 20

@@ -17,21 +17,21 @@ prometheus:
 
     # Persistent storage
     persistentVolume:
-      enabled: true
-      storageClass: "standard"
-      size: 20Gi
+      enabled: false
+      storageClass: "default"
+      size: 5Gi
+
+    # Data retention
+    retention: 7d
 
     # Resources
     resources:
       limits:
-        cpu: 1000m
-        memory: 2Gi
+        cpu: 50m
+        memory: 128Mi
       requests:
-        cpu: 500m
-        memory: 1Gi
-
-    # Data retention
-    retention: 15d
+        cpu: 25m
+        memory: 64Mi
 
     # Configuration
     config:
@@ -152,23 +152,13 @@ prometheus:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
 
-    # Ingress configuration
+    # Ingress configuration - disabled for port-forward access
     ingress:
-      enabled: true
-      className: "nginx"
-      annotations:
-        nginx.ingress.kubernetes.io/rewrite-target: /
-        nginx.ingress.kubernetes.io/ssl-redirect: "false"
-      hosts:
-        - host: prometheus.localhost
-          paths:
-            - path: /
-              pathType: Prefix
-      tls: []
+      enabled: false
 
   # Node Exporter
   nodeExporter:
-    enabled: true
+    enabled: false
     image:
       repository: prom/node-exporter
       tag: v1.6.1
@@ -176,11 +166,11 @@ prometheus:
 
     resources:
       limits:
-        cpu: 200m
-        memory: 50Mi
-      requests:
         cpu: 100m
         memory: 30Mi
+      requests:
+        cpu: 50m
+        memory: 20Mi
 
     service:
       port: 9100
@@ -216,9 +206,9 @@ grafana:
 
   # Persistence
   persistence:
-    enabled: true
-    storageClassName: "standard"
-    size: 10Gi
+    enabled: false
+    storageClassName: "default"
+    size: 2Gi
 
   # Admin user
   adminUser: admin
@@ -227,11 +217,11 @@ grafana:
   # Resources
   resources:
     limits:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 50m
+      memory: 128Mi
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 25m
+      memory: 64Mi
 
   # Service configuration
   service:
@@ -239,24 +229,15 @@ grafana:
     port: 3000
     targetPort: 3000
 
-  # Ingress configuration
+  # Ingress configuration - disabled for port-forward access
   ingress:
-    enabled: true
-    className: "nginx"
-    annotations:
-      nginx.ingress.kubernetes.io/rewrite-target: /
-      nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    hosts:
-      - grafana.localhost
-    paths:
-      - path: /
-        pathType: Prefix
-    tls: []
+    enabled: false
 
   # Grafana configuration
   grafana.ini:
     server:
-      root_url: http://grafana.localhost
+      root_url: http://localhost:3000/
+      serve_from_sub_path: false
     auth.anonymous:
       enabled: false
 
@@ -380,20 +361,20 @@ loki:
 
     # Persistent storage
     persistence:
-      enabled: true
-      size: 20Gi
-      storageClassName: "standard"
+      enabled: false
+      size: 2Gi
+      storageClassName: "default"
       accessModes:
         - ReadWriteOnce
 
     # Resources
     resources:
       limits:
-        cpu: 500m
-        memory: 1Gi
+        cpu: 50m
+        memory: 128Mi
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: 25m
+        memory: 64Mi
 
   # Service configuration
   service:
@@ -479,11 +460,11 @@ fluentbit:
   # Resources
   resources:
     limits:
-      cpu: 200m
-      memory: 200Mi
+      cpu: 50m
+      memory: 64Mi
     requests:
-      cpu: 100m
-      memory: 100Mi
+      cpu: 25m
+      memory: 32Mi
 
   # Node selector
   nodeSelector:

@@ -52,9 +52,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "appointments-app.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
+{{- if .Values.serviceAccount.create -}}
 {{- default (include "appointments-app.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
+{{- else -}}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
@@ -118,14 +118,22 @@ app.kubernetes.io/component: {{ .name }}
 Create database connection string
 */}}
 {{- define "appointments-app.db.connectionString" -}}
+{{- if .context.Values.postgresql.external.enabled -}}
+Host={{ .context.Values.postgresql.external.host }};Port={{ .context.Values.postgresql.external.port }};Database={{ .database.name }};Username={{ .database.user }};Password={{ .database.password }};SslMode={{ .context.Values.postgresql.external.sslMode }}
+{{- else -}}
 Host={{ include "appointments-app.postgresql.name" .context }};Port={{ .context.Values.postgresql.port }};Database={{ .database.name }};Username={{ .database.user }};Password={{ .database.password }}
+{{- end }}
 {{- end }}
 
 {{/*
 Create migration connection string
 */}}
 {{- define "appointments-app.db.migrationConnectionString" -}}
+{{- if .context.Values.postgresql.external.enabled -}}
+Host={{ .context.Values.postgresql.external.host }};Port={{ .context.Values.postgresql.external.port }};Database={{ .database.name }};Username={{ .context.Values.postgresql.external.adminUsername }};Password={{ .context.Values.postgresql.admin.password }};SslMode={{ .context.Values.postgresql.external.sslMode }}
+{{- else -}}
 Host={{ include "appointments-app.postgresql.name" .context }};Port={{ .context.Values.postgresql.port }};Database={{ .database.name }};Username={{ .context.Values.postgresql.admin.username }};Password={{ .context.Values.postgresql.admin.password }}
+{{- end }}
 {{- end }}
 
 {{/*

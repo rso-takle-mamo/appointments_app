@@ -1,0 +1,240 @@
+# Production values for Appointments App on Azure AKS
+
+global:
+  imagePullPolicy: Always
+  environment: Production
+  namespace: appointments-app
+
+fullnameOverride: "appointments-app"
+nameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+secrets:
+  jwtSecretKey: "MVlaQ2pBaG5iTXlkWU1waTBLb2JoRUFGSHZxY1oxTTZSaWRyOUtvZXMvdz0="
+  vatcheckApiKey: "dmF0X2xpdmVfMEp4N2pLUWdOMDRDMk85ZGJaZTU4THloWFRFdEpKNnhMOXBxd2pHUA=="
+  eventHubsConnectionString: "RW5kcG9pbnQ9c2I6Ly9hcHBvaW50bWVudHMtZXZlbnRodWJzLnNlcnZpY2VidXMud2luZG93cy5uZXQvO1NoYXJlZEFjY2Vzc0tleU5hbWU9Um9vdE1hbmFnZVNoYXJlZEFjY2Vzc0tleTtTaGFyZWRBY2Nlc3NLZXk9cDRPa1hSZ0lQMUYwd29nb2pMYkJGWTRLb3NyWTdocURzK0FFaEdTUWFVRT0="
+
+# Azure Database for PostgreSQL Flexible Server
+postgresql:
+  enabled: false
+  init:
+    enabled: false
+  admin:
+    username: "postgresadmin"
+    password: "6XQeQZ155O9H9Em2LP5BiPtm"
+  external:
+    enabled: true
+    host: "appointments-postgres.postgres.database.azure.com"
+    port: 5432
+    sslMode: "require"
+    adminUsername: "postgresadmin"
+
+# Kafka configuration using Azure Event Hubs (Kafka-compatible)
+kafka:
+  bootstrapServers: "appointments-eventhubs.servicebus.windows.net:9093"
+  securityProtocol: "SASL_SSL"
+  saslMechanism: "PLAIN"
+  topics:
+    userEvents: "user-events"
+    tenantEvents: "tenant-events"
+    providerEvents: "provider-events"
+    serviceCatalogEvents: "service-catalog-events"
+    bookingEvents: "booking-events"
+  producers:
+    acks: "all"
+    enableIdempotence: "true"
+    messageTimeoutMs: "5000"
+    requestTimeoutMs: "3000"
+  consumers:
+    enableAutoCommit: "false"
+    autoOffsetReset: "earliest"
+
+# Services configuration - using ACR images
+services:
+  user:
+    enabled: true
+    image: appointmentsapp.azurecr.io/user-service:0.1.0
+    replicas: 1 # keep 1, student subscription has limited resources
+    port: 8000
+    database:
+      name: userdb
+      user: userdb_user
+      password: "8bs2wxwP7ibrcWUL"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: appointmentsapp.azurecr.io/user-database-migrator:0.1.0
+      enabled: true
+
+  serviceCatalog:
+    enabled: true
+    image: appointmentsapp.azurecr.io/service-catalog-service:0.1.0
+    replicas: 1
+    port: 8000
+    database:
+      name: servicedb
+      user: servicedb_user
+      password: "CXs58LJpj63f3NnP"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: appointmentsapp.azurecr.io/service-catalog-database-migrator:0.1.0
+      enabled: true
+
+  availability:
+    enabled: true
+    image: appointmentsapp.azurecr.io/availability-service:0.1.0
+    replicas: 1
+    port: 8000
+    database:
+      name: availabilitydb
+      user: availabilitydb_user
+      password: "qmf0r7ue9icVpz5O"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: appointmentsapp.azurecr.io/availability-database-migrator:0.1.0
+      enabled: true
+
+  booking:
+    enabled: true
+    image: appointmentsapp.azurecr.io/booking-service:0.1.0
+    replicas: 1
+    port: 8000
+    database:
+      name: bookingdb
+      user: bookingdb_user
+      password: "8Lw5N3TD46K1QiUz"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: appointmentsapp.azurecr.io/booking-database-migrator:0.1.0
+      enabled: true
+
+  notification:
+    enabled: true
+    image: appointmentsapp.azurecr.io/notification-service:0.1.0
+    replicas: 1
+    port: 8000
+    database:
+      name: notificationdb
+      user: notificationdb_user
+      password: "T67vmxB2d020TK3t"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "250m"
+    health:
+      livenessPath: /health/live
+      readinessPath: /health/ready
+    migration:
+      image: appointmentsapp.azurecr.io/notification-database-migrator:0.1.0
+      enabled: true
+
+# Ingress configuration for NGINX Ingress Controller
+ingress:
+  enabled: true
+  className: webapprouting.kubernetes.azure.com
+  host: "4.165.176.7.nip.io"
+  paths:
+    auth: /api/auth
+    users: /api/users
+    tenants: /api/tenants
+    services: /api/services
+    categories: /api/categories
+    availability: /api/availability
+    bookings: /api/bookings
+  annotations: {}
+  tls:
+    enabled: false
+
+# Migrations
+migrations:
+  enabled: true
+  targetMigration: ""  # Empty means latest
+  jobTtlSecondsAfterFinished: 86400
+
+# Service discovery
+service:
+  type: ClusterIP
+
+
+healthProbes:
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  startup:
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - user-service
+                  - service-catalog-service
+                  - availability-service
+                  - booking-service
+                  - notification-service
+          topologyKey: kubernetes.io/hostname

@@ -4,10 +4,15 @@ metadata:
   name: kafka-config
   namespace: {{ .Values.global.namespace }}
 data:
-  # Connection settings
   bootstrap.servers: {{ .Values.kafka.bootstrapServers | quote }}
+  {{- if .Values.kafka.securityProtocol }}
+  security.protocol: {{ .Values.kafka.securityProtocol | quote }}
+  {{- end }}
+  {{- if .Values.kafka.saslMechanism }}
+  sasl.mechanism: {{ .Values.kafka.saslMechanism | quote }}
+  {{- end }}
 
-  # Topics - centralized source of truth
+  # Topics
   topics.user-events: {{ .Values.kafka.topics.userEvents | quote }}
   topics.tenant-events: {{ .Values.kafka.topics.tenantEvents | quote }}
   topics.provider-events: {{ .Values.kafka.topics.providerEvents | quote }}
@@ -23,3 +28,7 @@ data:
   # Consumer settings
   consumers.enableAutoCommit: {{ .Values.kafka.consumers.enableAutoCommit | quote }}
   consumers.autoOffsetReset: {{ .Values.kafka.consumers.autoOffsetReset | quote }}
+
+  # Azure Event Hubs compatibility settings
+  api.version.request: "false"
+  broker.version.fallback: "1.0.0"

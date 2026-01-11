@@ -16,6 +16,7 @@ spec:
       labels:
         {{- include "appointments-app.service.selectorLabels" (dict "context" . "name" "serviceCatalog") | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "appointments-app.serviceAccountName" . }}
       {{- if .Values.postgresql.init.enabled }}
       initContainers:
       - name: service-catalog-db-init
@@ -138,6 +139,25 @@ spec:
             configMapKeyRef:
               name: kafka-config
               key: producers.requestTimeoutMs
+        {{- if .Values.kafka.securityProtocol }}
+        - name: KAFKA__SECURITYPROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: security.protocol
+        - name: KAFKA__SASLMECHANISM
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: sasl.mechanism
+        - name: KAFKA__SASLUSERNAME
+          value: "$ConnectionString"
+        - name: KAFKA__SASLPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "appointments-app.fullname" . }}-secrets
+              key: eventhubs-connection-string
+        {{- end }}
         resources:
           {{- toYaml .Values.services.serviceCatalog.resources | nindent 10 }}
         livenessProbe:

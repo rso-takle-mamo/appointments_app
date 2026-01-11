@@ -16,6 +16,7 @@ spec:
       labels:
         {{- include "appointments-app.service.selectorLabels" (dict "context" . "name" "user") | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "appointments-app.serviceAccountName" . }}
       {{- if .Values.postgresql.init.enabled }}
       initContainers:
       - name: user-db-init
@@ -116,6 +117,25 @@ spec:
               key: topics.provider-events
         - name: KAFKA__CLIENTID
           value: "user-service"
+        {{- if .Values.kafka.securityProtocol }}
+        - name: KAFKA__SECURITYPROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: security.protocol
+        - name: KAFKA__SASLMECHANISM
+          valueFrom:
+            configMapKeyRef:
+              name: kafka-config
+              key: sasl.mechanism
+        - name: KAFKA__SASLUSERNAME
+          value: "$ConnectionString"
+        - name: KAFKA__SASLPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "appointments-app.fullname" . }}-secrets
+              key: eventhubs-connection-string
+        {{- end }}
         resources:
           {{- toYaml .Values.services.user.resources | nindent 10 }}
         livenessProbe:
